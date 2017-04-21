@@ -56,23 +56,60 @@ trait MainHelpers extends inox.MainHelpers {
   )
 
   def main(args: Array[String]): Unit = {
+    println("Hello World!!!")
     val inoxCtx = setup(args)
     val compilerArgs = libraryFiles ++ args.toList.filterNot(_.startsWith("--"))
 
-    val (structure, program) = extractFromSource(inoxCtx, compilerArgs)
+    val (structure, program) = Bench.time("extraction", { extractFromSource(inoxCtx, compilerArgs) })
 
-    val activeComponents = components.filter { c =>
+    val activeComponents = Bench.time("findActive", { components.filter { c =>
       inoxCtx.options.options.collectFirst {
         case inox.OptionValue(o, value: Boolean) if o.name == c.name => value
       }.getOrElse(false)
-    }
+    }})
 
-    val toExecute = if (activeComponents.isEmpty) {
+    val toExecute = Bench.time("findToExecute", { if (activeComponents.isEmpty) {
       Seq(verification.VerificationComponent)
     } else {
       activeComponents
-    }
+    }})
 
-    for (c <- toExecute) c(structure, program).emit()
+    for (c <- toExecute) Bench.time(c.toString, { c(structure, program).emit() })
+    
+    Bench.reportS
+  }
+}
+
+
+object Bench {
+  val start = System.nanoTime
+
+  var times: Map[String,Double] = Map()
+  var mintimes: Map[String,Double] = Map()
+  var maxtimes: Map[String,Double] = Map()
+  var counts: Map[String,Int] = Map()
+  
+  def time[R](s: String, block: => R): R = {
+//     println("timing")
+    val t0 = System.nanoTime
+    val result = block    // call-by-name
+    val t1 = System.nanoTime
+    mintimes = mintimes.updated(s,Math.min(mintimes.getOrElse(s,Double.MaxValue),t1 - t0))
+    maxtimes = maxtimes.updated(s,Math.max(maxtimes.getOrElse(s,0.0),t1 - t0))
+    times = times.updated(s,times.getOrElse(s,0.0) + t1 - t0)
+    counts = counts.updated(s,counts.getOrElse(s,0) + 1)
+    result
+  }
+  
+  def reportS() = {
+    if (!times.isEmpty) {
+      val maxsize = times.map(_._1.size).max
+      println("====== REPORT ======")
+      println(times.map { case (s:String,t:Double) => "== %s: %.2fs\t%.2fs\t%.2fs\t%s".
+        format(s.padTo(maxsize,' '),t/1000000000.0,mintimes(s)/1000000000.0,maxtimes(s)/1000000000.0,counts(s))
+      }.toList.sorted.map(s => (1 to s.count(_=='/')).map("  ").mkString + s).mkString("\n"))
+      println("Total time: " + (System.nanoTime - start)/1000000000.0)
+      println("====================")
+    }
   }
 }
