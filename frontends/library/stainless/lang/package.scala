@@ -3,6 +3,7 @@
 package stainless
 
 import stainless.annotation._
+import stainless.collection._
 import scala.language.implicitConversions
 
 package object lang {
@@ -30,6 +31,9 @@ package object lang {
   }
 
   @inline @library def because(b: Boolean) = b
+  @library def optassert(name: String, b: Boolean) = ()
+  @inline @library def proofContext(assumptions: List[String], body: Unit) = body
+
 
   @ignore def forall[A](p: A => Boolean): Boolean = sys.error("Can't execute quantified proposition")
   @ignore def forall[A,B](p: (A,B) => Boolean): Boolean = sys.error("Can't execute quantified proposition")

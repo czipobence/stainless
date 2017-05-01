@@ -85,7 +85,7 @@ trait Expressions extends inox.ast.Expressions with inox.ast.Types { self: Trees
     * @param error An optional error string to display if the assert fails. Third argument of `assert(..., ...)`
     * @param body The expression following `optassert(..., ...)`
     */
-  case class OptAssert(name: Symbol, pred: Expr, error: Option[String], body: Expr) extends Expr with CachingTyped {
+  case class OptAssert(name: String, pred: Expr, error: Option[String], body: Expr) extends Expr with CachingTyped {
     protected def computeType(implicit s: Symbols): Type = {
       if (pred.getType == BooleanType) body.getType
       else Untyped
@@ -100,7 +100,7 @@ trait Expressions extends inox.ast.Expressions with inox.ast.Types { self: Trees
     * @param body The expression following the because environment
     */
 
-  case class Because(assumptions: List[Symbol], inside: Expr, body: Expr) extends Expr with CachingTyped {
+  case class Because(assumptions: List[String], inside: Expr, body: Expr) extends Expr with CachingTyped {
     protected def computeType(implicit s: Symbols): Type = body.getType
   }
 

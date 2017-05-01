@@ -88,9 +88,11 @@ trait DefaultTactic extends Tactic {
             (e, Not(env.path.toClause))
 
           case (a@Assert(cond, _, _), env) =>
+            println("wouas")
             (a, env.path implies cond)
 
           case (a@OptAssert(_, cond, _, _), env) =>
+            println("wouais")
             (a, env.path implies cond)
 
           case (app@Application(caller, args), env) =>
@@ -105,6 +107,9 @@ trait DefaultTactic extends Tactic {
     }
 
     val calls = x.collect2(getFunction(id).fullBody)
+
+    println("default tactic calls")
+    println(calls)
 
     calls.map { case (e, correctnessCond) =>
       VC(correctnessCond, id, eToVCKind(e)).setPos(e)

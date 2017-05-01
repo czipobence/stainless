@@ -689,7 +689,10 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
 
       protected implicit val scope = this
 
-      def rewrite(id: Identifier): Boolean = functions(id).rewrite
+      def rewrite(id: Identifier): Boolean = {
+        if (id.toString == "assert") throw new Exception("lol")
+        functions(id).rewrite
+      }
 
       private def isSimpleFunction(fun: s.FunAbstraction): Boolean = {
         import symbols._
@@ -783,92 +786,107 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         new Scope(functions, newTparams, graph)
       }
 
-      override def transform(e: s.Expr): t.Expr = e match {
-        case s.ClassConstructor(ct, args) =>
-          choose(ValDef(FreshIdentifier("ptr", true), IntegerType, Set(Unchecked))) { res =>
-            typeOf(res) === encodeType(ct) &&
-            andJoin((ct.tcd(symbols).fields zip args).map(p => getField(res, p._1.id) === transform(p._2)))
-          }
+      override def transform(e: s.Expr): t.Expr = {
+//        if (e.toString.contains("false_theorem")) {
+//          println("transforming")
+//          println(e)
+//        }
+        e match {
+          case s.ClassConstructor(ct, args) =>
+//            if (e.toString.contains("false_theorem")) println("cc")
+            choose(ValDef(FreshIdentifier("ptr", true), IntegerType, Set(Unchecked))) { res =>
+              typeOf(res) === encodeType(ct) &&
+                andJoin((ct.tcd(symbols).fields zip args).map(p => getField(res, p._1.id) === transform(p._2)))
+            }
 
-        case s.ClassSelector(expr, id) =>
-          getField(transform(expr), id)
+          case s.ClassSelector(expr, id) =>
+//            if (e.toString.contains("false_theorem")) println("cs")
+            getField(transform(expr), id)
 
-        case s.IsInstanceOf(expr, tpe) if isObject(symbols.leastUpperBound(expr.getType(symbols), tpe)) =>
-          instanceOf(transform(expr), encodeType(tpe))
+          case s.IsInstanceOf(expr, tpe) if isObject(symbols.leastUpperBound(expr.getType(symbols), tpe)) =>
+//            if (e.toString.contains("false_theorem")) println("dingue")
+            instanceOf(transform(expr), encodeType(tpe))
 
-        case s.AsInstanceOf(expr, tpe) if isObject(symbols.leastUpperBound(expr.getType(symbols), tpe)) =>
-          val exprType = expr.getType(symbols)
-          val te = transform(expr)
-          val check = subtypeOf(if (isObject(exprType)) typeOf(te) else encodeType(exprType), encodeType(tpe))
-          val result = if (isObject(exprType) && !isObject(tpe)) unwrap(te, transform(tpe))
+          case s.AsInstanceOf(expr, tpe) if isObject(symbols.leastUpperBound(expr.getType(symbols), tpe)) =>
+//            if (e.toString.contains("false_theorem")) println("wow")
+//            println("assertions")
+//            println(expr, tpe)
+            val exprType = expr.getType(symbols)
+            val te = transform(expr)
+            val check = subtypeOf(if (isObject(exprType)) typeOf(te) else encodeType(exprType), encodeType(tpe))
+            val result = if (isObject(exprType) && !isObject(tpe)) unwrap(te, transform(tpe))
             else if (!isObject(exprType) && isObject(tpe)) wrap(te, transform(tpe))
             else te
 
-          t.Assert(check, Some("Cast error"), result)
+            t.Assert(check, Some("Cast error"), result)
 
-        case (_: s.ADTSelector | _: s.MapApply) if isObject(e.getType(symbols)) =>
-          let("res" :: tpe, super.transform(e)) { res =>
-            t.Assume(instanceOf(res, encodeType(e.getType(symbols))), res)
-          }
-
-        case fi @ s.FunctionInvocation(id, tps, args) if scope rewrite id =>
-          val fdScope = this in id
-          val fd = symbols.getFunction(id)
-
-          val newArgs = (fd.params zip args).map { case (vd, arg) =>
-            unifyTypes(transform(arg), transform(arg.getType(symbols)), fdScope.transform(vd.tpe))
-          } ++ tps.map(encodeType)
-
-          unifyTypes(
-            t.FunctionInvocation(id, Seq(), newArgs),
-            fdScope.transform(fd.returnType),
-            transform(fi.getType(symbols))
-          )
-
-        case app @ s.ApplyLetRec(v, tparams, tps, args) if scope rewrite v.id =>
-          val appScope = this in v.id
-          val fun = functions(v.id).fun
-
-          val newArgs = (fun.params zip args).map { case (vd, arg) =>
-            unifyTypes(transform(arg), transform(arg.getType(symbols)), appScope.transform(vd.tpe))
-          } ++ tps.map(encodeType)
-
-          val vd @ t.ValDef(id, FunctionType(from, to), flags) = appScope.transform(v.toVal)
-          val nvd = vd.copy(tpe = FunctionType(from ++ tparams.map(_ => tpe), to))
-
-          unifyTypes(
-            t.ApplyLetRec(nvd.toVariable, Seq(), Seq(), newArgs),
-            appScope.transform(fun.returnType),
-            transform(app.getType(symbols))
-          )
-
-        case app @ s.ApplyLetRec(v, tparams, tps, args) =>
-          val appScope = functions(v.id).outer.get
-          t.ApplyLetRec(
-            appScope.transform(v.toVal).toVariable,
-            tparams map (appScope.transform(_).asInstanceOf[t.TypeParameter]),
-            tps map transform,
-            args map transform
-          )
-
-        case s.MatchExpr(scrut, cases) =>
-          t.MatchExpr(transform(scrut), for (cse <- cases) yield {
-            val (newPattern, newGuard) = transformPattern(scrut, cse.pattern)
-            val guard = t.andJoin(cse.optGuard.map(transform).toSeq ++ newGuard) match {
-              case t.BooleanLiteral(true) => None
-              case cond => Some(cond)
+          case (_: s.ADTSelector | _: s.MapApply) if isObject(e.getType(symbols)) =>
+//            if (e.toString.contains("false_theorem")) println("zz")
+            let("res" :: tpe, super.transform(e)) { res =>
+              t.Assume(instanceOf(res, encodeType(e.getType(symbols))), res)
             }
-            t.MatchCase(newPattern, guard, transform(cse.rhs))
-          })
 
-        case s.LetRec(fds, body) =>
-          val funs = fds.map(fd => s.Inner(fd))
-          val newScope = scope withFunctions funs
-          val newFuns = funs.map(fun => transformFunction(fun)(newScope))
-          val newBody = newScope.transform(body)
-          t.LetRec(newFuns.map(_.toLocal), newBody)
+          case fi@s.FunctionInvocation(id, tps, args) if scope rewrite id =>
+            if (e.toString.contains("false_theorem")) println("fi")
+            val fdScope = this in id
+            val fd = symbols.getFunction(id)
 
-        case _ => super.transform(e)
+            val newArgs = (fd.params zip args).map { case (vd, arg) =>
+              unifyTypes(transform(arg), transform(arg.getType(symbols)), fdScope.transform(vd.tpe))
+            } ++ tps.map(encodeType)
+
+            unifyTypes(
+              t.FunctionInvocation(id, Seq(), newArgs),
+              fdScope.transform(fd.returnType),
+              transform(fi.getType(symbols))
+            )
+
+          case app@s.ApplyLetRec(v, tparams, tps, args) if scope rewrite v.id =>
+            val appScope = this in v.id
+            val fun = functions(v.id).fun
+
+            val newArgs = (fun.params zip args).map { case (vd, arg) =>
+              unifyTypes(transform(arg), transform(arg.getType(symbols)), appScope.transform(vd.tpe))
+            } ++ tps.map(encodeType)
+
+            val vd@t.ValDef(id, FunctionType(from, to), flags) = appScope.transform(v.toVal)
+            val nvd = vd.copy(tpe = FunctionType(from ++ tparams.map(_ => tpe), to))
+
+            unifyTypes(
+              t.ApplyLetRec(nvd.toVariable, Seq(), Seq(), newArgs),
+              appScope.transform(fun.returnType),
+              transform(app.getType(symbols))
+            )
+
+          case app@s.ApplyLetRec(v, tparams, tps, args) =>
+            val appScope = functions(v.id).outer.get
+            t.ApplyLetRec(
+              appScope.transform(v.toVal).toVariable,
+              tparams map (appScope.transform(_).asInstanceOf[t.TypeParameter]),
+              tps map transform,
+              args map transform
+            )
+
+          case s.MatchExpr(scrut, cases) =>
+            t.MatchExpr(transform(scrut), for (cse <- cases) yield {
+              val (newPattern, newGuard) = transformPattern(scrut, cse.pattern)
+              val guard = t.andJoin(cse.optGuard.map(transform).toSeq ++ newGuard) match {
+                case t.BooleanLiteral(true) => None
+                case cond => Some(cond)
+              }
+              t.MatchCase(newPattern, guard, transform(cse.rhs))
+            })
+
+          case s.LetRec(fds, body) =>
+            val funs = fds.map(fd => s.Inner(fd))
+            val newScope = scope withFunctions funs
+            val newFuns = funs.map(fun => transformFunction(fun)(newScope))
+            val newBody = newScope.transform(body)
+            t.LetRec(newFuns.map(_.toLocal), newBody)
+
+          case _ =>
+            super.transform(e)
+        }
       }
 
       private def transformPattern(scrut: s.Expr, pattern: s.Pattern): (t.Pattern, Option[t.Expr]) = {

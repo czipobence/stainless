@@ -653,9 +653,22 @@ trait CodeExtraction extends ASTExtractors {
         case Nil => xt.UnitLiteral()
 
         case (e @ ExAssertExpression(contract, oerr)) :: xs =>
+          println("block assertion")
           val const = extractTree(contract)(vctx)
           val b     = rec(xs)
           xt.Assert(const, oerr, b).setPos(e.pos)
+
+        case (e @ ExOptAssertExpression(name, contract, oerr)) :: xs =>
+          println("block opt assertion")
+          val const = extractTree(contract)(vctx)
+          val b     = rec(xs)
+          xt.OptAssert(name, const, oerr, b).setPos(e.pos)
+
+        case (e @ ExBecause(assumptions, body)) :: xs =>
+          println("block because")
+          val const = extractTree(body)(vctx)
+          val b     = rec(xs)
+          xt.Because(assumptions, const, b).setPos(e.pos)
 
         case (e @ ExRequiredExpression(contract)) :: xs =>
           val pre = extractTree(contract)(vctx)
@@ -705,13 +718,24 @@ trait CodeExtraction extends ASTExtractors {
       }
     }
 
-    private def extractTree(tr: Tree)(implicit dctx: DefContext): xt.Expr = (tr match {
+    private def extractTree(tr: Tree)(implicit dctx: DefContext): xt.Expr = {
+      if (tr.toString.contains("false_theorem")) println("extracting", tr)
+      tr match {
       case Block(es, e) =>
         val b = extractBlock(es :+ e)
         xt.exprOps.flattenBlocks(b)
 
       case ExAssertExpression(e, oerr) =>
+        println("Found assertion")
         xt.Assert(extractTree(e), oerr, xt.UnitLiteral().setPos(tr.pos))
+
+      case ExOptAssertExpression(name, e, oerr) =>
+        println("Found opt assertion")
+        xt.OptAssert(name, extractTree(e), oerr, xt.UnitLiteral().setPos(tr.pos))
+
+      case ExBecause(assumptions, body) =>
+        println("Found proof context")
+        xt.Because(assumptions, extractTree(body), xt.UnitLiteral().setPos(tr.pos))
 
       case ExRequiredExpression(body) =>
         xt.Require(extractTree(body), xt.UnitLiteral().setPos(tr.pos))
@@ -1158,7 +1182,7 @@ trait CodeExtraction extends ASTExtractors {
 
       // default behaviour is to complain :)
       case _ => outOfSubsetError(tr, "Could not extract " + tr + " (Scala tree of type "+tr.getClass+")")
-    }).setPos(tr.pos)
+    }}.setPos(tr.pos)
 
     private def extractType(t: Tree)(implicit dctx: DefContext): xt.Type = {
       extractType(t.tpe)(dctx, t.pos)
