@@ -70,22 +70,41 @@ trait DefaultTactic extends Tactic {
     }
 
     // We don't collect preconditions here, because these are handled by generatePreconditions
-    val calls = transformers.CollectorWithPC(program) {
-      case (m @ MatchExpr(scrut, cases), path) =>
-        (m, path implies orJoin(cases map (matchCaseCondition[Path](scrut, _).toClause)))
+    val x = new transformers.CollectorWithPCOptAssert {
 
-      case (e @ Error(_, _), path) =>
-        (e, Not(path.toClause))
+      type Result = (Expr, Expr)
+      val trees: program.trees.type = program.trees
+      val symbols: program.symbols.type = program.symbols
 
-      case (a @ Assert(cond, _, _), path) =>
-        (a, path implies cond)
+      def initEnv = PathWithOptAsserts(Path.empty, Map())
 
-      case (app @ Application(caller, args), path) =>
-        (app, path implies Application(Pre(caller), args))
+      //      private val fLifted = f.lift
 
-      case (c @ Choose(res, pred), path) if !(res.flags contains Unchecked) =>
-        (c, path implies Not(Forall(Seq(res), Not(pred))))
-    }.collect(getFunction(id).fullBody)
+      val f: PartialFunction[(Expr,PathWithOptAsserts), (Expr, Expr)] =  {
+          case (m@MatchExpr(scrut, cases), env) =>
+            (m, env.path implies orJoin(cases map (matchCaseCondition[Path](scrut, _).toClause)))
+
+          case (e@Error(_, _), env) =>
+            (e, Not(env.path.toClause))
+
+          case (a@Assert(cond, _, _), env) =>
+            (a, env.path implies cond)
+
+          case (a@OptAssert(_, cond, _, _), env) =>
+            (a, env.path implies cond)
+
+          case (app@Application(caller, args), env) =>
+            (app, env.path implies Application(Pre(caller), args))
+
+          case (c@Choose(res, pred), env) if !(res.flags contains Unchecked) =>
+            (c, env.path implies Not(Forall(Seq(res), Not(pred))))
+      }
+
+      protected def step(e: Expr, env: PathWithOptAsserts): List[Result] = f.lift((e,env)).toList
+
+    }
+
+    val calls = x.collect2(getFunction(id).fullBody)
 
     calls.map { case (e, correctnessCond) =>
       VC(correctnessCond, id, eToVCKind(e)).setPos(e)

@@ -78,6 +78,32 @@ trait Expressions extends inox.ast.Expressions with inox.ast.Types { self: Trees
     }
   }
 
+  /** Named assertions with customizable error message
+    *
+    * @param name The name of the assertion
+    * @param pred The predicate, second argument of `optassert(..., ...)`
+    * @param error An optional error string to display if the assert fails. Third argument of `assert(..., ...)`
+    * @param body The expression following `optassert(..., ...)`
+    */
+  case class OptAssert(name: Symbol, pred: Expr, error: Option[String], body: Expr) extends Expr with CachingTyped {
+    protected def computeType(implicit s: Symbols): Type = {
+      if (pred.getType == BooleanType) body.getType
+      else Untyped
+    }
+  }
+
+
+  /** Because context that activates some named assertions
+    *
+    * @param assumptions The assumptions of this because context
+    * @param inside The expressions where the assumptions are active
+    * @param body The expression following the because environment
+    */
+
+  case class Because(assumptions: List[Symbol], inside: Expr, body: Expr) extends Expr with CachingTyped {
+    protected def computeType(implicit s: Symbols): Type = body.getType
+  }
+
 
   /* First-class function specs */
 
