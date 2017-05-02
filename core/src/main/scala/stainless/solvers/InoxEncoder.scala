@@ -124,7 +124,7 @@ trait InoxEncoder extends ProgramEncoder {
       case s.OptAssert(name, pred, error, body) =>
         t.Assume(transform(pred), transform(body))
 
-      case s.Because(name, inside, body) =>
+      case s.ProofContext(name, inside, body) =>
         t.Assume(transform(inside), transform(body))
 
       case s.FiniteArray(elems, base) =>

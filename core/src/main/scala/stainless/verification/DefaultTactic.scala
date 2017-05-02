@@ -69,6 +69,7 @@ trait DefaultTactic extends Tactic {
         VCKind.Assert
     }
 
+
     // We don't collect preconditions here, because these are handled by generatePreconditions
     val x = new transformers.CollectorWithPCOptAssert {
 
@@ -81,36 +82,29 @@ trait DefaultTactic extends Tactic {
       //      private val fLifted = f.lift
 
       val f: PartialFunction[(Expr,PathWithOptAsserts), (Expr, Expr)] =  {
-          case (m@MatchExpr(scrut, cases), env) =>
-            (m, env.path implies orJoin(cases map (matchCaseCondition[Path](scrut, _).toClause)))
+        case (m@MatchExpr(scrut, cases), env) =>
+          (m, env.path implies orJoin(cases map (matchCaseCondition[Path](scrut, _).toClause)))
 
-          case (e@Error(_, _), env) =>
-            (e, Not(env.path.toClause))
+        case (e@Error(_, _), env) =>
+          (e, Not(env.path.toClause))
 
-          case (a@Assert(cond, _, _), env) =>
-            println("wouas")
-            (a, env.path implies cond)
+        case (a@Assert(cond, _, _), env) =>
+          (a, env.path implies cond)
 
-          case (a@OptAssert(_, cond, _, _), env) =>
-            println("wouais")
-            (a, env.path implies cond)
+        case (a@OptAssert(_, cond, _, _), env) =>
+          (a, env.path implies cond)
 
-          case (app@Application(caller, args), env) =>
-            (app, env.path implies Application(Pre(caller), args))
+        case (app@Application(caller, args), env) =>
+          (app, env.path implies Application(Pre(caller), args))
 
-          case (c@Choose(res, pred), env) if !(res.flags contains Unchecked) =>
-            (c, env.path implies Not(Forall(Seq(res), Not(pred))))
+        case (c@Choose(res, pred), env) if !(res.flags contains Unchecked) =>
+          (c, env.path implies Not(Forall(Seq(res), Not(pred))))
       }
-
       protected def step(e: Expr, env: PathWithOptAsserts): List[Result] = f.lift((e,env)).toList
 
     }
 
     val calls = x.collect2(getFunction(id).fullBody)
-
-    println("default tactic calls")
-    println(calls)
-
     calls.map { case (e, correctnessCond) =>
       VC(correctnessCond, id, eToVCKind(e)).setPos(e)
     }

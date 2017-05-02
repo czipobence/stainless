@@ -47,8 +47,8 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
       (Seq(), Seq(pred, body), Seq(), (_, es, _) => t.Assert(es(0), error, es(1)))
     case s.OptAssert(name, pred, error, body) =>
       (Seq(), Seq(pred, body), Seq(), (_, es, _) => t.OptAssert(name, es(0), error, es(1)))
-    case s.Because(assumptions, inside, body) =>
-      (Seq(), Seq(inside, body), Seq(), (_, es, _) => t.Because(assumptions, es(0), es(1)))
+    case s.ProofContext(assumptions, inside, body) =>
+      (Seq(), Seq(inside, body), Seq(), (_, es, _) => t.ProofContext(assumptions, es(0), es(1)))
     case s.Pre(f) =>
       (Seq(), Seq(f), Seq(), (_, es, _) => t.Pre(es.head))
 

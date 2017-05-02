@@ -31,8 +31,8 @@ package object lang {
   }
 
   @inline @library def because(b: Boolean) = b
-  @library def optassert(name: String, b: Boolean) = ()
-  @inline @library def proofContext(assumptions: List[String], body: Unit) = body
+  @library def optassert(name: scala.Symbol, b: Boolean) = ()
+  @inline @library def proofContext(assumptions: List[scala.Symbol], body: Unit) = body
 
 
   @ignore def forall[A](p: A => Boolean): Boolean = sys.error("Can't execute quantified proposition")

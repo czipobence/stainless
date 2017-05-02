@@ -489,20 +489,22 @@ trait ASTExtractors {
       }
     }
 
-//    def treeToSymbol(t: Tree) = {
-//      println("treeToSymbol: '" +  t.toString + "'")
-//      println("treeToSymbol: '" +  t.summaryString + "'")
-//      t.toString
-//    }
+    /** Extracts scala.Symbol */
+    object ExScalaSymbol {
+      def unapply(tree: Apply): Option[scala.Symbol] = tree match {
+        case Apply(ExSelected("scala","Symbol","apply"), (x: Literal) :: Nil) =>
+          Some(Symbol(x.value.stringValue))
+      }
+    }
 
     /** Extracts the 'optassert' contract from an expression (only if it's the
       * first call in the block). */
     object ExOptAssertExpression {
-      def unapply(tree: Apply): Option[(String, Tree, Option[String])] = tree match {
-        case Apply(ExSelected("stainless", "lang", "package", "optassert"), (name: Literal) :: contractBody :: Nil) =>
-          Some((name.value.stringValue, contractBody, None))
-        case Apply(ExSelected("stainless", "lang", "package", "optassert"), (name: Literal) :: contractBody :: (error: Literal) :: Nil) =>
-          Some((name.value.stringValue, contractBody, Some(error.value.stringValue)))
+      def unapply(tree: Apply): Option[(scala.Symbol, Tree, Option[String])] = tree match {
+        case Apply(ExSelected("stainless", "lang", "package", "optassert"), ExScalaSymbol(name) :: contractBody :: Nil) =>
+          Some((name, contractBody, None))
+        case Apply(ExSelected("stainless", "lang", "package", "optassert"), ExScalaSymbol(name) :: contractBody :: (error: Literal) :: Nil) =>
+          Some((name, contractBody, Some(error.value.stringValue)))
         case _ =>
           None
       }
@@ -510,26 +512,15 @@ trait ASTExtractors {
 
     /** Extracts the 'Because' context */
     object ExBecause {
-      def unapply(tree: Apply): Option[(List[String], Tree)] = {
+      def unapply(tree: Apply): Option[(List[scala.Symbol], Tree)] = {
 
-        if (tree.toString.contains("proofContext")) {
-          println("trying to unapply: " + tree)
-//          println(tree.summaryString)
-        }
         tree match {
           case Apply(ExSelected("stainless", "lang", "package", "proofContext"), l :: body :: Nil) =>
-            println("unapplied")
-            println(l)
-            println(l.shortClass)
-            println(l.summaryString)
             l match {
               case Apply(TypeApply(ExSelected("stainless", "collection", "List", "apply"), t), args) =>
-                println("apply")
-                println(t.map(_.shortClass))
-                println(t.map(_.summaryString))
                 Some((args.map {
-                  case l: Literal => l.value.stringValue
-                  case s => error("The first argument of a proof context should be List.apply(...) with Strings."); ""
+                  case ExScalaSymbol(s) => s
+                  case s => error("The first argument of a proof context should be List.apply(...) with scala Symbols."); 'err
                 }, body))
               case _ => error("The first argument of a proof context should be List.apply(...)."); None
             }

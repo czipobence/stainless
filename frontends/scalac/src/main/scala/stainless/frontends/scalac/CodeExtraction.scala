@@ -653,22 +653,19 @@ trait CodeExtraction extends ASTExtractors {
         case Nil => xt.UnitLiteral()
 
         case (e @ ExAssertExpression(contract, oerr)) :: xs =>
-          println("block assertion")
           val const = extractTree(contract)(vctx)
           val b     = rec(xs)
           xt.Assert(const, oerr, b).setPos(e.pos)
 
         case (e @ ExOptAssertExpression(name, contract, oerr)) :: xs =>
-          println("block opt assertion")
           val const = extractTree(contract)(vctx)
           val b     = rec(xs)
           xt.OptAssert(name, const, oerr, b).setPos(e.pos)
 
         case (e @ ExBecause(assumptions, body)) :: xs =>
-          println("block because")
           val const = extractTree(body)(vctx)
           val b     = rec(xs)
-          xt.Because(assumptions, const, b).setPos(e.pos)
+          xt.ProofContext(assumptions, const, b).setPos(e.pos)
 
         case (e @ ExRequiredExpression(contract)) :: xs =>
           val pre = extractTree(contract)(vctx)
@@ -735,7 +732,7 @@ trait CodeExtraction extends ASTExtractors {
 
       case ExBecause(assumptions, body) =>
         println("Found proof context")
-        xt.Because(assumptions, extractTree(body), xt.UnitLiteral().setPos(tr.pos))
+        xt.ProofContext(assumptions, extractTree(body), xt.UnitLiteral().setPos(tr.pos))
 
       case ExRequiredExpression(body) =>
         xt.Require(extractTree(body), xt.UnitLiteral().setPos(tr.pos))
