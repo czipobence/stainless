@@ -122,10 +122,10 @@ trait InoxEncoder extends ProgramEncoder {
         t.Assume(transform(pred), transform(body))
 
       case s.OptAssert(name, pred, error, body) =>
-        t.Assume(transform(pred), transform(body))
+        transform(body)
 
       case s.ProofContext(name, inside, body) =>
-        t.Assume(transform(inside), transform(body))
+        transform(body)
 
       case s.FiniteArray(elems, base) =>
         t.ADT(t.ADTType(arrayID, Seq(transform(base))), Seq(
