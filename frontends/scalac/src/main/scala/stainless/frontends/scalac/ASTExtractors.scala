@@ -489,6 +489,55 @@ trait ASTExtractors {
       }
     }
 
+    /** Extracts boolean or unit decorations symbol. */
+    object ExBD {
+      def unapply(tree: Tree): Boolean = tree match {
+        case ExSelected("stainless", "lang", "package", "BooleanDecorations") => true
+        case ExSelected("stainless", "lang", "package", "UnitDecorations") => true
+        case _ => false
+      }
+    }
+
+    /** Extracts the 'as' boolean decoration. */
+    object ExAsExpression {
+      def unapply(tree: Apply): Option[(Tree,scala.Symbol)] = tree match {
+        case Apply(Select(Apply(ExBD(), underlying :: Nil), ExNamed("as")), ExScalaSymbol(name) :: Nil) =>
+          Some((underlying,name))
+        case _ =>
+          None
+      }
+    }
+
+    /** Extracts the 'using' boolean decoration. */
+    object ExUsingExpression {
+      def unapply(tree: Apply): Option[(Tree,List[scala.Symbol])] = tree match {
+        case Apply(Select(Apply(ExBD(), underlying :: Nil), ExNamed("using")), props) =>
+          Some((underlying,props.map {
+            case ExScalaSymbol(s) => s
+            case _ => throw new Exception("Using takes Symbol's as arguments.")
+          }))
+        case _ =>
+          None
+      }
+    }
+
+    /** Extracts the name assertiions with propositions' references contract from an expression (only if it's the
+      * first call in the block). */
+    object ExBigAssertExpression {
+      def unapply(tree: Apply): Option[(Tree, Option[String], Option[scala.Symbol], List[scala.Symbol])] = tree match {
+        case ExUsingExpression(ExAsExpression(b, name), props) =>
+          Some((b, None, Some(name), props))
+        case ExAsExpression(ExUsingExpression(b, props), name) =>
+          Some((b, None, Some(name), props))
+        case ExAsExpression(b, name) =>
+          Some((b, None, Some(name), List()))
+        case ExUsingExpression(b, props) =>
+          Some((b, None, None, props))
+        case _ =>
+          None
+      }
+    }
+
     /** Extracts scala.Symbol */
     object ExScalaSymbol {
       def unapply(tree: Apply): Option[scala.Symbol] = tree match {
@@ -497,38 +546,38 @@ trait ASTExtractors {
       }
     }
 
-    /** Extracts the 'optassert' contract from an expression (only if it's the
-      * first call in the block). */
-    object ExOptAssertExpression {
-      def unapply(tree: Apply): Option[(scala.Symbol, Tree, Option[String])] = tree match {
-        case Apply(ExSelected("stainless", "lang", "package", "optassert"), ExScalaSymbol(name) :: contractBody :: Nil) =>
-          Some((name, contractBody, None))
-        case Apply(ExSelected("stainless", "lang", "package", "optassert"), ExScalaSymbol(name) :: contractBody :: (error: Literal) :: Nil) =>
-          Some((name, contractBody, Some(error.value.stringValue)))
-        case _ =>
-          None
-      }
-    }
-
-    /** Extracts the 'Because' context */
-    object ExBecause {
-      def unapply(tree: Apply): Option[(List[scala.Symbol], Tree)] = {
-
-        tree match {
-          case Apply(ExSelected("stainless", "lang", "package", "proofContext"), l :: body :: Nil) =>
-            l match {
-              case Apply(TypeApply(ExSelected("stainless", "collection", "List", "apply"), t), args) =>
-                Some((args.map {
-                  case ExScalaSymbol(s) => s
-                  case s => error("The first argument of a proof context should be List.apply(...) with scala Symbols."); 'err
-                }, body))
-              case _ => error("The first argument of a proof context should be List.apply(...)."); None
-            }
-          case _ =>
-            None
-        }
-      }
-    }
+//    /** Extracts the 'optassert' contract from an expression (only if it's the
+//      * first call in the block). */
+//    object ExOptAssertExpression {
+//      def unapply(tree: Apply): Option[(scala.Symbol, Tree, Option[String])] = tree match {
+//        case Apply(ExSelected("stainless", "lang", "package", "optassert"), ExScalaSymbol(name) :: contractBody :: Nil) =>
+//          Some((name, contractBody, None))
+//        case Apply(ExSelected("stainless", "lang", "package", "optassert"), ExScalaSymbol(name) :: contractBody :: (error: Literal) :: Nil) =>
+//          Some((name, contractBody, Some(error.value.stringValue)))
+//        case _ =>
+//          None
+//      }
+//    }
+//
+//    /** Extracts the 'Because' context */
+//    object ExBecause {
+//      def unapply(tree: Apply): Option[(List[scala.Symbol], Tree)] = {
+//
+//        tree match {
+//          case Apply(ExSelected("stainless", "lang", "package", "proofContext"), l :: body :: Nil) =>
+//            l match {
+//              case Apply(TypeApply(ExSelected("stainless", "collection", "List", "apply"), t), args) =>
+//                Some((args.map {
+//                  case ExScalaSymbol(s) => s
+//                  case s => error("The first argument of a proof context should be List.apply(...) with scala Symbols."); 'err
+//                }, body))
+//              case _ => error("The first argument of a proof context should be List.apply(...)."); None
+//            }
+//          case _ =>
+//            None
+//        }
+//      }
+//    }
 
     /** Matches an object with no type parameters, and regardless of its
       * visibility. Does not match on case objects or the automatically generated companion

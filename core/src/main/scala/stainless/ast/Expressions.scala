@@ -78,32 +78,20 @@ trait Expressions extends inox.ast.Expressions with inox.ast.Types { self: Trees
     }
   }
 
-  /** Named assertions with customizable error message
+  /** Local assertions with customizable error message, name, and propositions' references
     *
-    * @param name The name of the assertion
-    * @param pred The predicate, second argument of `optassert(..., ...)`
-    * @param error An optional error string to display if the assert fails. Third argument of `assert(..., ...)`
-    * @param body The expression following `optassert(..., ...)`
+    * @param pred The predicate, first argument of `assert(..., ...)`
+    * @param error An optional error string to display if the assert fails. Second argument of `assert(..., ...)`
+    * @param body The expression following `assert(..., ...)`
+    * @param name The (optional) name of the assertion
+    * @param props The list of named assertions used to prove this assertion
     */
-  case class OptAssert(name: scala.Symbol, pred: Expr, error: Option[String], body: Expr) extends Expr with CachingTyped {
+  case class BigAssert(pred: Expr, error: Option[String], body: Expr, name: Option[scala.Symbol], props: List[scala.Symbol]) extends Expr with CachingTyped {
     protected def computeType(implicit s: Symbols): Type = {
       if (pred.getType == BooleanType) body.getType
       else Untyped
     }
   }
-
-
-  /** Because context that activates some named assertions
-    *
-    * @param assumptions The assumptions of this because context
-    * @param inside The expressions where the assumptions are active
-    * @param body The expression following the because environment
-    */
-
-  case class ProofContext(assumptions: List[scala.Symbol], inside: Expr, body: Expr) extends Expr with CachingTyped {
-    protected def computeType(implicit s: Symbols): Type = body.getType
-  }
-
 
   /* First-class function specs */
 

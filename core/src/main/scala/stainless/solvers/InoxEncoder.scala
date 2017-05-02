@@ -121,10 +121,10 @@ trait InoxEncoder extends ProgramEncoder {
       case s.Assert(pred, error, body) =>
         t.Assume(transform(pred), transform(body))
 
-      case s.OptAssert(name, pred, error, body) =>
-        transform(body)
+      case s.BigAssert(pred, _, body, None, _) =>
+        t.Assume(transform(pred), transform(body))
 
-      case s.ProofContext(name, inside, body) =>
+      case s.BigAssert(pred, _, body, Some(_), _) =>
         transform(body)
 
       case s.FiniteArray(elems, base) =>

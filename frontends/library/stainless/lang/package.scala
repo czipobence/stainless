@@ -25,14 +25,28 @@ package object lang {
     }
 
     @inline
+    def as(name: scala.Symbol): Unit = ()
+
+    @inline
+    def using(name: scala.Symbol*): Unit = ()
+
+    @inline
     def ==>(that: => Boolean): Boolean = {
       if (underlying) that else true
     }
   }
 
+  @library
+  implicit class UnitDecorations(val underlying: Unit) {
+    @inline
+    def as(name: scala.Symbol): Unit = ()
+
+    @inline
+    def using(name: scala.Symbol*): Unit = ()
+  }
+
   @inline @library def because(b: Boolean) = b
-  @library def optassert(name: scala.Symbol, b: Boolean) = ()
-  @inline @library def proofContext(assumptions: List[scala.Symbol], body: Unit) = body
+
 
 
   @ignore def forall[A](p: A => Boolean): Boolean = sys.error("Can't execute quantified proposition")

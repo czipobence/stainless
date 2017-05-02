@@ -340,7 +340,7 @@ trait SymbolOps extends inox.ast.SymbolOps { self: TypeOps =>
 
       protected def step(e: Expr, path: Path): List[Expr] = e match {
         case Assert(pred, _, _) => List(path implies pred)
-        case OptAssert(_, pred, _, _) => List(path implies pred)
+        case BigAssert(pred, _, _, _, _) => List(path implies pred)
         case Require(pred, _) => List(path implies pred)
 
         case fi @ FunctionInvocation(_, _, args) =>

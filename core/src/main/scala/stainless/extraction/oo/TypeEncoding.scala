@@ -689,10 +689,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
 
       protected implicit val scope = this
 
-      def rewrite(id: Identifier): Boolean = {
-        if (id.toString == "assert") throw new Exception("lol")
-        functions(id).rewrite
-      }
+      def rewrite(id: Identifier): Boolean = functions(id).rewrite
 
       private def isSimpleFunction(fun: s.FunAbstraction): Boolean = {
         import symbols._

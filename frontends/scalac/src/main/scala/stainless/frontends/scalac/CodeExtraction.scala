@@ -657,15 +657,11 @@ trait CodeExtraction extends ASTExtractors {
           val b     = rec(xs)
           xt.Assert(const, oerr, b).setPos(e.pos)
 
-        case (e @ ExOptAssertExpression(name, contract, oerr)) :: xs =>
+        case (e @ ExBigAssertExpression(contract, oerr, oname, props)) :: xs =>
           val const = extractTree(contract)(vctx)
           val b     = rec(xs)
-          xt.OptAssert(name, const, oerr, b).setPos(e.pos)
-
-        case (e @ ExBecause(assumptions, body)) :: xs =>
-          val const = extractTree(body)(vctx)
-          val b     = rec(xs)
-          xt.ProofContext(assumptions, const, b).setPos(e.pos)
+//          println("bigassert",const,oerr,b,oname,props)
+          xt.BigAssert(const, oerr, b, oname, props).setPos(e.pos)
 
         case (e @ ExRequiredExpression(contract)) :: xs =>
           val pre = extractTree(contract)(vctx)
@@ -716,23 +712,17 @@ trait CodeExtraction extends ASTExtractors {
     }
 
     private def extractTree(tr: Tree)(implicit dctx: DefContext): xt.Expr = {
-      if (tr.toString.contains("false_theorem")) println("extracting", tr)
+//      if (tr.toString.contains("using")) println("extracting", tr)
       tr match {
       case Block(es, e) =>
         val b = extractBlock(es :+ e)
         xt.exprOps.flattenBlocks(b)
 
       case ExAssertExpression(e, oerr) =>
-        println("Found assertion")
         xt.Assert(extractTree(e), oerr, xt.UnitLiteral().setPos(tr.pos))
 
-      case ExOptAssertExpression(name, e, oerr) =>
-        println("Found opt assertion")
-        xt.OptAssert(name, extractTree(e), oerr, xt.UnitLiteral().setPos(tr.pos))
-
-      case ExBecause(assumptions, body) =>
-        println("Found proof context")
-        xt.ProofContext(assumptions, extractTree(body), xt.UnitLiteral().setPos(tr.pos))
+      case ExBigAssertExpression(e, oerr, oname, props) =>
+        xt.BigAssert(extractTree(e), oerr, xt.UnitLiteral().setPos(tr.pos), oname, props)
 
       case ExRequiredExpression(body) =>
         xt.Require(extractTree(body), xt.UnitLiteral().setPos(tr.pos))

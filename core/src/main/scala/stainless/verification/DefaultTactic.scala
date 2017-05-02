@@ -42,6 +42,9 @@ trait DefaultTactic extends Tactic {
       case _ : MatchExpr =>
         VCKind.ExhaustiveMatch
 
+      case BigAssert(_, _, _, _, _) =>
+        VCKind.BigAssert
+
       case Assert(_, Some(err), _) =>
         if (err.startsWith("Array ")) {
           VCKind.ArrayUsage
@@ -91,8 +94,8 @@ trait DefaultTactic extends Tactic {
         case (a@Assert(cond, _, _), env) =>
           (a, env.path implies cond)
 
-        case (a@OptAssert(_, cond, _, _), env) =>
-          (a, env.path implies cond)
+        case (a@BigAssert(cond, _, _, _, props), env) =>
+          (a, (env withConds(props)).path implies cond)
 
         case (app@Application(caller, args), env) =>
           (app, env.path implies Application(Pre(caller), args))

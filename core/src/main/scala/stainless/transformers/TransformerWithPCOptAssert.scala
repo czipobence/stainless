@@ -22,16 +22,24 @@ trait TransformerWithPCOptAssert extends TransformerWithPC {
       PathWithOptAsserts(path withCond expr, optAsserts)
     }
 
-    def withConds(l: List[scala.Symbol]): PathWithOptAsserts = l match {
-      case Nil => this
-      case x :: xs =>
-        if (optAsserts.contains(x))
-          this.withCond(optAsserts(x)).withConds(xs)
-        else
-          sys.error("No assertion named '" + x + "' in that context.")
+    def withConds(l: List[scala.Symbol]): PathWithOptAsserts = {
+//      println("Using conditions: " + l)
+      l match {
+        case Nil => this
+        case x :: xs =>
+          if (optAsserts.contains(x))
+            this.withCond(optAsserts(x)).withConds(xs)
+          else
+            sys.error("No assertion named '" + x + "' in that context.")
+      }
     }
 
-    def withOptAssert(name: scala.Symbol, expr: Expr) = PathWithOptAsserts(path, optAsserts.updated(name, expr))
+    def withOptAssert(name: Option[scala.Symbol], expr: Expr) = name match {
+      case None =>
+        PathWithOptAsserts(path withCond expr, optAsserts)
+      case Some(name) =>
+        PathWithOptAsserts(path, optAsserts.updated(name, expr))
+    }
 
     override def merge(that: PathWithOptAsserts): PathWithOptAsserts = {
       val PathWithOptAsserts(path2, optAsserts2) = that
@@ -46,15 +54,10 @@ trait TransformerWithPCOptAssert extends TransformerWithPC {
 
   override protected def rec(e: Expr, env: PathWithOptAsserts): Expr = e match {
 
-    case OptAssert(name, pred, err, body) =>
+    case BigAssert(pred, err, body, name, props) =>
       val spred = rec(pred, env)
       val sbody = rec(body, env withOptAssert (name,spred))
-      OptAssert(name, spred, err, sbody).copiedFrom(e)
-
-    case ProofContext(assumptions, inside, body) =>
-      val sinside = rec(inside, env withConds (assumptions))
-      val sbody = rec(body, env)
-      ProofContext(assumptions, sinside, sbody).copiedFrom(e)
+      BigAssert(spred, err, sbody, name, props).copiedFrom(e)
 
     case _ => super.rec(e, env)
   }
