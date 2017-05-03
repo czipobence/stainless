@@ -26,6 +26,22 @@ trait Printer extends inox.ast.Printer {
       p"""|assert($pred)
           |$body"""
 
+    case BigAssert(pred, None, body, None, Nil) =>
+      p"""|assert($pred)
+          |$body"""
+
+    case BigAssert(pred, None, body, Some(name), Nil) =>
+      p"""|$pred as $name
+          |$body"""
+
+    case BigAssert(pred, None, body, None, props) =>
+      p"""|$pred using $props
+          |$body"""
+
+    case BigAssert(pred, None, body, Some(name), props) =>
+      p"""|$pred as $name using $props
+          |$body"""
+
     case Ensuring(body, post) =>
       p"""|{
           |  $body

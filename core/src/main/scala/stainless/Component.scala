@@ -59,6 +59,12 @@ trait SimpleComponent extends Component { self =>
       case None => relevant
     }
 
+
+    for (fd <- relevant) {
+      println("SIMPLE COMPONENT")
+      println(symbols.functions(fd))
+    }
+
     apply(functions, extracted)
   }
 

@@ -649,57 +649,63 @@ trait CodeExtraction extends ASTExtractors {
         }
       }
 
-      def rec(es: List[Tree]): xt.Expr = es match {
-        case Nil => xt.UnitLiteral()
+      def rec(es: List[Tree]): xt.Expr = {
+        if (es.toString.contains("using")) {
+          println("extracting list of trees")
+          println(es)
+        }
+        es match {
+          case Nil => xt.UnitLiteral()
 
-        case (e @ ExAssertExpression(contract, oerr)) :: xs =>
-          val const = extractTree(contract)(vctx)
-          val b     = rec(xs)
-          xt.Assert(const, oerr, b).setPos(e.pos)
+          case (e @ ExAssertExpression(contract, oerr)) :: xs =>
+            val const = extractTree(contract)(vctx)
+            val b     = rec(xs)
+            xt.Assert(const, oerr, b).setPos(e.pos)
 
-        case (e @ ExBigAssertExpression(contract, oerr, oname, props)) :: xs =>
-          val const = extractTree(contract)(vctx)
-          val b     = rec(xs)
-//          println("bigassert",const,oerr,b,oname,props)
-          xt.BigAssert(const, oerr, b, oname, props).setPos(e.pos)
+          case (e @ ExBigAssertExpression(contract, oerr, oname, props)) :: xs =>
+            val const = extractTree(contract)(vctx)
+            val b     = rec(xs)
+            println("bigassert",const,oerr,b,oname,props)
+            xt.BigAssert(const, oerr, b, oname, props).setPos(e.pos)
 
-        case (e @ ExRequiredExpression(contract)) :: xs =>
-          val pre = extractTree(contract)(vctx)
-          val b   = rec(xs)
-          xt.Require(pre, b).setPos(e.pos)
+          case (e @ ExRequiredExpression(contract)) :: xs =>
+            val pre = extractTree(contract)(vctx)
+            val b   = rec(xs)
+            xt.Require(pre, b).setPos(e.pos)
 
-        case (e @ ExDecreasesExpression(ranks)) :: xs =>
-          val rs = ranks.map(extractTree(_)(vctx))
-          val b = rec(xs)
-          xt.Decreases(xt.tupleWrap(rs), b).setPos(e.pos)
+          case (e @ ExDecreasesExpression(ranks)) :: xs =>
+            val rs = ranks.map(extractTree(_)(vctx))
+            val b = rec(xs)
+            xt.Decreases(xt.tupleWrap(rs), b).setPos(e.pos)
 
-        case (d @ ExFunctionDef(sym, tparams, vparams, tpt, rhs)) :: xs =>
-          val (vd, tdefs) = vctx.localFuns(sym)
-          val fd = extractFunction(sym, tparams, vparams, rhs, typeParams = Some(tdefs.map(_.tp)))(vctx)
-          val letRec = xt.LocalFunDef(vd, tdefs, xt.Lambda(fd.params, fd.fullBody).setPos(d.pos))
+          case (d @ ExFunctionDef(sym, tparams, vparams, tpt, rhs)) :: xs =>
+            val (vd, tdefs) = vctx.localFuns(sym)
+            val fd = extractFunction(sym, tparams, vparams, rhs, typeParams = Some(tdefs.map(_.tp)))(vctx)
+            val letRec = xt.LocalFunDef(vd, tdefs, xt.Lambda(fd.params, fd.fullBody).setPos(d.pos))
 
-          rec(xs) match {
-            case xt.LetRec(defs, body) => xt.LetRec(letRec +: defs, body).setPos(d.pos)
-            case other => xt.LetRec(Seq(letRec), other).setPos(d.pos)
-          }
+            rec(xs) match {
+              case xt.LetRec(defs, body) => xt.LetRec(letRec +: defs, body).setPos(d.pos)
+              case other => xt.LetRec(Seq(letRec), other).setPos(d.pos)
+            }
 
-        case (v @ ValDef(mods, name, tpt, _)) :: xs =>
-          if (mods.isMutable) {
-            xt.LetVar(vds(v.symbol), extractTree(v.rhs)(vctx), rec(xs)).setPos(v.pos)
-          } else {
-            xt.Let(vds(v.symbol), extractTree(v.rhs)(vctx), rec(xs)).setPos(v.pos)
-          }
+          case (v @ ValDef(mods, name, tpt, _)) :: xs =>
+            if (mods.isMutable) {
+              xt.LetVar(vds(v.symbol), extractTree(v.rhs)(vctx), rec(xs)).setPos(v.pos)
+            } else {
+              xt.Let(vds(v.symbol), extractTree(v.rhs)(vctx), rec(xs)).setPos(v.pos)
+            }
 
-        case x :: Nil =>
-          extractTree(x)(vctx)
+          case x :: Nil =>
+            extractTree(x)(vctx)
 
-        case x :: rest =>
-          rec(rest) match {
-            case xt.Block(elems, last) =>
-              xt.Block(extractTree(x)(vctx) +: elems, last).setPos(x.pos)
-            case e =>
-              xt.Block(Seq(extractTree(x)(vctx)), e).setPos(x.pos)
-          }
+          case x :: rest =>
+            rec(rest) match {
+              case xt.Block(elems, last) =>
+                xt.Block(extractTree(x)(vctx) +: elems, last).setPos(x.pos)
+              case e =>
+                xt.Block(Seq(extractTree(x)(vctx)), e).setPos(x.pos)
+            }
+        }
       }
 
       rec(es)
@@ -712,9 +718,13 @@ trait CodeExtraction extends ASTExtractors {
     }
 
     private def extractTree(tr: Tree)(implicit dctx: DefContext): xt.Expr = {
-//      if (tr.toString.contains("using")) println("extracting", tr)
+      if (tr.toString.contains("using")) println("extracting", tr)
       tr match {
       case Block(es, e) =>
+        if (tr.toString.contains("using")) {
+          println("matched a block")
+          println(es, e)
+        }
         val b = extractBlock(es :+ e)
         xt.exprOps.flattenBlocks(b)
 

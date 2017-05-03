@@ -23,7 +23,7 @@ trait TransformerWithPCOptAssert extends TransformerWithPC {
     }
 
     def withConds(l: List[scala.Symbol]): PathWithOptAsserts = {
-//      println("Using conditions: " + l)
+      println("Using conditions: " + l)
       l match {
         case Nil => this
         case x :: xs =>
@@ -36,8 +36,10 @@ trait TransformerWithPCOptAssert extends TransformerWithPC {
 
     def withOptAssert(name: Option[scala.Symbol], expr: Expr) = name match {
       case None =>
+        println("Adding assertion to path",expr)
         PathWithOptAsserts(path withCond expr, optAsserts)
       case Some(name) =>
+        println("Adding name assertion",name,expr)
         PathWithOptAsserts(path, optAsserts.updated(name, expr))
     }
 
@@ -52,13 +54,18 @@ trait TransformerWithPCOptAssert extends TransformerWithPC {
 
   }
 
-  override protected def rec(e: Expr, env: PathWithOptAsserts): Expr = e match {
+  override protected def rec(e: Expr, env: PathWithOptAsserts): Expr = {
 
-    case BigAssert(pred, err, body, name, props) =>
-      val spred = rec(pred, env)
-      val sbody = rec(body, env withOptAssert (name,spred))
-      BigAssert(spred, err, sbody, name, props).copiedFrom(e)
+    println("recurring", e, env)
+    println("=====\n\n")
+    e match {
 
-    case _ => super.rec(e, env)
+      case BigAssert(pred, err, body, name, props) =>
+        val spred = rec(pred, env)
+        val sbody = rec(body, env withOptAssert (name,spred))
+        BigAssert(spred, err, sbody, name, props).copiedFrom(e)
+
+      case _ => super.rec(e, env)
+    }
   }
 }

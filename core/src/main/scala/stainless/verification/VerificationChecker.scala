@@ -63,6 +63,8 @@ trait VerificationChecker { self =>
       val tactic = getTactic(fd)
 
       if (fd.body.isDefined) {
+        println("FULL BODY VERIFY")
+        println(fd.fullBody)
         tactic.generateVCs(id)
       } else {
         Nil

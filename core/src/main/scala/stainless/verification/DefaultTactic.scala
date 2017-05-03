@@ -73,6 +73,10 @@ trait DefaultTactic extends Tactic {
     }
 
 
+    println("FULL BODY")
+    println(getFunction(id).fullBody)
+    throw new Exception("full body")
+
     // We don't collect preconditions here, because these are handled by generatePreconditions
     val x = new transformers.CollectorWithPCOptAssert {
 

@@ -75,6 +75,11 @@ object VerificationComponent extends SimpleComponent {
     val toVerify = funs.sortBy(getFunction(_).getPos)
 
     for (id <- toVerify) {
+      println("VERIFICATION COMPONENT")
+      println(getFunction(id).fullBody)
+    }
+
+    for (id <- toVerify) {
       if (getFunction(id).flags contains "library") {
         // FIXME: qualified name of `id`
         ctx.reporter.warning("Forcing verification of " + id + " which was assumed verified")
