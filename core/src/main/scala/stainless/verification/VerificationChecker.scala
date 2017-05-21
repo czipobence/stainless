@@ -104,12 +104,29 @@ trait VerificationChecker { self =>
     initMap ++ results
   }
 
+  private def removeUnusedLets(e: Expr): Expr = {
+    exprOps.postMap({
+      case Let(vd,_,body) =>
+        if (exprOps.variablesOf(body).contains(vd.toVariable)) None
+        else Some(body)
+      case _ => None
+    }, applyRec=true)(e)
+  }
+
+  private def removeAsserts(e: Expr): Expr = {
+    exprOps.preMap({
+      case Assert(_, _, body) => Some(body)
+      case _ => None
+    }, applyRec=true)(e)
+  }
+
   private def checkVC(vc: VC, sf: SolverFactory { val program: self.program.type }): VCResult = {
     import SolverResponses._
     val s = sf.getNewSolver
 
     try {
-      val cond = simplifyLets(vc.condition)
+      val cond_aux = simplifyLets(vc.condition)
+      val cond = removeUnusedLets(removeAsserts(cond_aux))
       ctx.reporter.synchronized {
         ctx.reporter.info(s" - Now considering '${vc.kind}' VC for ${vc.fd} @${vc.getPos}...")
         ctx.reporter.debug(cond.asString)
