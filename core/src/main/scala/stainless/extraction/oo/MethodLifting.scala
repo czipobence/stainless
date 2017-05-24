@@ -138,17 +138,19 @@ trait MethodLifting extends inox.ast.SymbolTransformer { self =>
 
       val subCalls = (for (co <- cos.toSeq) yield {
         firstOverrides(co).toSeq.map { case (cid, either) =>
-          val descType = default.transform(tcd.descendants.find(_.id == cid).get.toType).asInstanceOf[t.ClassType]
-          val thiss = t.AsInstanceOf(arg.toVariable, descType)
-          (t.IsInstanceOf(arg.toVariable, descType), either match {
-            case Left(nfd) => t.FunctionInvocation(
-              nfd.id,
-              descType.tps ++ fd.tparams.map(tdef => transformer.transform(tdef.tp)),
-              thiss +: fd.params.map(vd => transformer.transform(vd.toVariable))
-            )
-            case Right(vd) => t.ClassSelector(thiss, vd.id)
-          })
-        }
+          tcd.descendants.find(_.id == cid).map { descendant =>
+            val descType = default.transform(descendant.toType).asInstanceOf[t.ClassType]
+            val thiss = t.AsInstanceOf(arg.toVariable, descType)
+            (t.IsInstanceOf(arg.toVariable, descType), either match {
+              case Left(nfd) => t.FunctionInvocation(
+                nfd.id,
+                descType.tps ++ fd.tparams.map(tdef => transformer.transform(tdef.tp)),
+                thiss +: fd.params.map(vd => transformer.transform(vd.toVariable))
+              )
+              case Right(vd) => t.ClassSelector(thiss, vd.id)
+            })
+          }
+        }.flatten
       }).flatten
 
       val returnType = transformer.transform(fd.returnType)
