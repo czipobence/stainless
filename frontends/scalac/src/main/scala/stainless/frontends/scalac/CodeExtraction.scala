@@ -190,16 +190,16 @@ trait CodeExtraction extends ASTExtractors {
         case EmptyTree =>
           // ignore
 
-        case t if (
+        case t if util.Try(
           (annotationsOf(t.symbol) contains xt.Ignore) ||
           (t.symbol.isSynthetic && !t.symbol.isImplicit)
-        ) =>
+        ).getOrElse(false) =>
           // ignore
 
         case ExtractorHelpers.ExSymbol("stainless", "annotation", "ignore") =>
           // ignore (can't be @ignored because of the dotty compiler)
 
-        case ExConstructorDef() 
+        case ExConstructorDef()
            | ExLazyFieldDef()
            | ExFieldAccessorFunction() =>
           // ignore
@@ -234,7 +234,7 @@ trait CodeExtraction extends ASTExtractors {
           functions :+= fd.id
           allFunctions :+= fd
 
-        case t if t.symbol.isSynthetic =>
+        case t if util.Try(t.symbol.isSynthetic).getOrElse(true) =>
           // ignore
 
         case other =>
@@ -296,11 +296,11 @@ trait CodeExtraction extends ASTExtractors {
 
       val tpCtx = DefContext((tparamsSyms zip tparams).toMap)
 
-      val parents = cd.impl.parents.flatMap(p => p.tpe match {
+      val parents = util.Try(cd.impl.parents.flatMap(p => p.tpe match {
         case tpe if ignoreClasses(tpe) => None
         case tp @ TypeRef(_, _, _) => Some(extractType(tp)(tpCtx, p.pos).asInstanceOf[xt.ClassType])
         case _ => None
-      })
+      })).getOrElse(Nil)
 
       val annots = annotationsOf(sym)
       val flags = annots ++
@@ -310,9 +310,9 @@ trait CodeExtraction extends ASTExtractors {
       val constructor = cd.impl.children.find {
         case ExConstructorDef() => true
         case _ => false
-      }.get.asInstanceOf[DefDef]
+      }.collect { case dd: DefDef => dd }
 
-      val vds = constructor.vparamss.flatten
+      val vds: List[ValDef] = constructor.map(_.vparamss.flatten).getOrElse(Nil)
       val symbols = cd.impl.children.collect {
         case df @ DefDef(_, name, _, _, _, _)
         if df.symbol.isAccessor && df.symbol.isParamAccessor && !name.endsWith("_$eq") => df.symbol
@@ -900,7 +900,7 @@ trait CodeExtraction extends ASTExtractors {
             case xt.FunctionType(from, to) =>
               val args = from.map(tpe => xt.ValDef(FreshIdentifier("x", true), tpe).setPos(pred))
               xt.Forall(args, xt.Application(pred, args.map(_.toVariable)).setPos(pred))
-            case _ => 
+            case _ =>
               outOfSubsetError(tr, "Unsupported forall definition: " + tr)
           }
         }
@@ -1153,8 +1153,9 @@ trait CodeExtraction extends ASTExtractors {
         }
       }
 
-      // default behaviour is to complain :)
-      case _ => outOfSubsetError(tr, "Could not extract " + tr + " (Scala tree of type "+tr.getClass+")")
+      // default behaviour is to complain :(
+      case _ =>
+        outOfSubsetError(tr, s"Could not extract $tr (Scala tree of type ${tr.getClass})")
     }).setPos(tr.pos)
 
     private def extractType(t: Tree)(implicit dctx: DefContext): xt.Type = {
