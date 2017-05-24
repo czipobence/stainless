@@ -505,10 +505,10 @@ trait CodeExtraction extends ASTExtractors {
     }
 
     private def typeParamSymbols(tps: Seq[Type]): Seq[Symbol] = tps.flatMap {
-      case TypeRef(_, sym, Nil) =>
+      case TypeRef(_, sym, _) =>
         Some(sym)
       case t =>
-        outOfSubsetError(t.typeSymbol.pos, "Unhandled type for parameter: "+t)
+        outOfSubsetError(t.typeSymbol.pos, s"Unhandled type for parameter: $t (${t.getClass})")
         None
     }
 
