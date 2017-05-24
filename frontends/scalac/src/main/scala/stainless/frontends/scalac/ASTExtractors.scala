@@ -23,7 +23,7 @@ trait ASTExtractors {
   def getAnnotations(sym: Symbol, ignoreOwner: Boolean = false): Map[String, Seq[Tree]] = {
     val actualSymbol = sym.accessedOrSelf
     (for {
-      a <- actualSymbol.annotations ++ (if (!ignoreOwner) actualSymbol.owner.annotations else Set.empty)
+      a <- Option(actualSymbol.annotations).getOrElse(Set.empty) ++ (if (!ignoreOwner) Option(actualSymbol.owner.annotations).getOrElse(Set.empty) else Set.empty)
       name = a.atp.safeToString.replaceAll("\\.package\\.", ".")
     } yield {
       if (name startsWith "stainless.annotation.") {
@@ -195,7 +195,7 @@ trait ASTExtractors {
         case _ => None
        }
     }
-    
+
     /** Matches the `holds` expression at the end of any boolean expression with a proof as argument, and returns both of themn.*/
     object ExHoldsWithProofExpression {
       def unapply(tree: Apply) : Option[(Tree, Tree)] = tree match {
@@ -204,7 +204,7 @@ trait ASTExtractors {
         case _ => None
        }
     }
-    
+
     /** Matches the `because` method at the end of any boolean expression, and return the assertion and the cause. If no "because" method, still returns the expression */
     object ExMaybeBecauseExpressionWrapper {
       def unapply(tree: Tree) : Some[Tree] = tree match {
@@ -213,7 +213,7 @@ trait ASTExtractors {
         case body => Some(body)
        }
     }
-    
+
     /** Matches the `because` method at the end of any boolean expression, and return the assertion and the cause.*/
     object ExBecauseExpression {
       def unapply(tree: Apply) : Option[(Tree, Tree)] = tree match {
@@ -222,7 +222,7 @@ trait ASTExtractors {
         case _ => None
        }
     }
-    
+
     /** Matches the `bigLength` expression at the end of any string expression, and returns the expression.*/
     object ExBigLengthExpression {
       def unapply(tree: Apply) : Option[Tree] = tree match {
@@ -233,7 +233,7 @@ trait ASTExtractors {
         case _ => None
        }
     }
-    
+
     /** Matches the `bigSubstring` method at the end of any string expression, and returns the expression and the start index expression.*/
     object ExBigSubstringExpression {
       def unapply(tree: Apply) : Option[(Tree, Tree)] = tree match {
@@ -244,7 +244,7 @@ trait ASTExtractors {
         case _ => None
        }
     }
-    
+
     /** Matches the `bigSubstring` expression at the end of any string expression, and returns the expression, the start and end index expressions.*/
     object ExBigSubstring2Expression {
       def unapply(tree: Apply) : Option[(Tree, Tree, Tree)] = tree match {
