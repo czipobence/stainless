@@ -34,6 +34,8 @@ trait DefaultTactic extends Tactic {
       val fiS = sizeLimit(fi.asString, 40)
       VC(vc, id, VCKind.Info(VCKind.Precondition, s"call $fiS")).setPos(fi)
     }
+
+    Nil
   }
 
   def generateCorrectnessConditions(id: Identifier): Seq[VC] = {
