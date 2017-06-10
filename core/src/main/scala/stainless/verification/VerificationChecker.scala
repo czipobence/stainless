@@ -5,8 +5,14 @@ package verification
 
 import inox.solvers._
 
+import java.io.ObjectInputStream
+import java.io.FileInputStream
+import java.io.ObjectOutputStream
+import java.io.FileOutputStream
+
 object optParallelVCs extends inox.FlagOptionDef("parallelvcs", false)
 object optFailEarly extends inox.FlagOptionDef("failearly", false)
+object optVCCache extends inox.FlagOptionDef("vccache", false)
 
 object DebugSectionVerification extends inox.DebugSection("verification")
 
@@ -16,6 +22,8 @@ trait VerificationChecker { self =>
 
   private lazy val parallelCheck = options.findOptionOrDefault(optParallelVCs)
   private lazy val failEarly = options.findOptionOrDefault(optFailEarly)
+  private lazy val vccache = options.findOptionOrDefault(optVCCache)
+  private lazy val cacheFile = "vccache.bin"
 
   import program._
   import program.trees._
@@ -76,29 +84,89 @@ trait VerificationChecker { self =>
     ))
   }
 
+  // Self-Contained VC: stores all functions definitions needed for this VC
+  // FIXME: for soundness, we should also store all subtypes of the ADTs
+  // FIXME: e.g. caching e.isInstanceOf(A) || e.isInstanceOf(B) is not sound if we add "case class C extends T"
+  // FIXME: with e of type T, and case class A extends T, and case class B extends T.
+  type SCVC = String
+  def selfContained(vc: VC, program: self.program.type): SCVC = {
+    val callees = exprOps.functionCallsOf(vc.condition).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
+    val types: Set[String] = exprOps.collect {
+      case e => e.getType match {
+        case a @ ADTType(_,_) => Set(a.getADT.toString)
+        case _ => Set[String]()
+      }
+    } (vc.condition)
+
+    vc.condition.toString +
+      "\n\nFunction Definitions\n\n" +
+      callees.toList.sorted.mkString("\n\n") +
+      "\n\nType Definitions:\n\n" +
+      types.toList.sorted.mkString("\n\n")
+  }
+
+  def getVerifiedVCs(): Set[SCVC] = {
+    if (new java.io.File(cacheFile).exists) {
+      val ois = new ObjectInputStream(new FileInputStream(cacheFile))
+      val verifiedVCs = ois.readObject.asInstanceOf[Set[SCVC]]
+      ois.close()
+      verifiedVCs
+    }
+    else Set()
+  }
+
+  def writeVerifiedVCs(vcs: Set[SCVC]) = {
+    val oos = new ObjectOutputStream(new FileOutputStream(cacheFile))
+    oos.writeObject(vcs)
+    oos.close()
+  }
+
   private lazy val unknownResult: VCResult = VCResult(VCStatus.Unknown, None, None)
 
   def checkVCs(vcs: Seq[VC], sf: SolverFactory { val program: self.program.type }, stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
     var stop = false
 
     val initMap: Map[VC, VCResult] = vcs.map(vc => vc -> unknownResult).toMap
+    val verifiedVCs: Set[SCVC] = if (vccache) getVerifiedVCs() else Set()
+
+    for (scvc <- verifiedVCs) {
+      println("I have already verified the following VC:")
+      println(scvc)
+      println("==============================================")
+    }
+
+    def checkVCWithCache(vc: VC, sf: SolverFactory { val program: self.program.type }) = {
+      if (vccache && verifiedVCs.contains(selfContained(vc,program)))
+        VCResult(VCStatus.Valid, None, Some(0))
+      else
+        checkVC(vc,sf)
+    }
 
     // scala doesn't seem to have a nice common super-type of vcs and vcs.par, so these
     // two quasi-identical pieces of code have to remain separate...
     val results = if (parallelCheck) {
       for (vc <- vcs.par if !stop && !ctx.interruptManager.isInterrupted) yield {
-        val res = checkVC(vc, sf)
+        val res = checkVCWithCache(vc, sf)
         if (ctx.interruptManager.isInterrupted) ctx.interruptManager.reset()
         stop = stopWhen(res)
         vc -> res
       }
     } else {
       for (vc <- vcs if !stop && !ctx.interruptManager.isInterrupted) yield {
-        val res = checkVC(vc, sf)
+        val res = checkVCWithCache(vc, sf)
         if (ctx.interruptManager.isInterrupted) ctx.interruptManager.reset()
         stop = stopWhen(res)
         vc -> res
       }
+    }
+
+    if (vccache) {
+      val newVerifiedVCs: Set[SCVC] = Set[SCVC]() ++
+        results.
+          filter { case (vc, res) => res.isValid }.
+          map { case (vc, res) => selfContained(vc,program) }
+
+      writeVerifiedVCs(newVerifiedVCs)
     }
 
     initMap ++ results

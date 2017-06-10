@@ -66,3 +66,6 @@ out-classes
 /z3.exe
 /libz3java.dll
 /libz3java.lib
+
+# verification conditions cache
+vccache.bin
