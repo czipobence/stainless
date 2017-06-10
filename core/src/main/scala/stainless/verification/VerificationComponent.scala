@@ -72,20 +72,25 @@ object VerificationComponent extends SimpleComponent {
     import encoder.targetProgram.trees._
     import encoder.targetProgram.symbols._
 
-    val toVerify = funs.sortBy(getFunction(_).getPos)
+    Bench.time("check", {
 
-    for (id <- toVerify) {
-      if (getFunction(id).flags contains "library") {
-        val fullName = id.fullName
-        ctx.reporter.warning(s"Forcing verification of $fullName which was assumed verified")
+      val toVerify = funs.sortBy(getFunction(_).getPos)
+
+      for (id <- toVerify) {
+        if (getFunction(id).flags contains "library") {
+          val fullName = id.fullName
+          ctx.reporter.warning(s"Forcing verification of $fullName which was assumed verified")
+        }
       }
-    }
 
-    VerificationChecker.verify(encoder.targetProgram)(funs).mapValues {
-      case VCResult(VCStatus.Invalid(model), s, t) =>
-        VCResult(VCStatus.Invalid(model.encode(encoder.reverse)), s, t)
-      case res => res.asInstanceOf[VCResult[p.Model]]
-    }
+      Bench.time("verificationChecker", {
+        VerificationChecker.verify(encoder.targetProgram)(funs).mapValues {
+          case VCResult(VCStatus.Invalid(model), s, t) =>
+            VCResult(VCStatus.Invalid(model.encode(encoder.reverse)), s, t)
+          case res => res.asInstanceOf[VCResult[p.Model]]
+        }
+      })
+    })
   }
 
   def apply(funs: Seq[Identifier], p: StainlessProgram): VerificationReport = {

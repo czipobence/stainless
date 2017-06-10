@@ -129,6 +129,13 @@ trait VerificationChecker { self =>
     val initMap: Map[VC, VCResult] = vcs.map(vc => vc -> unknownResult).toMap
     val verifiedVCs: Set[SCVC] = if (vccache) getVerifiedVCs() else Set()
 
+    println("the whole program")
+
+    println(program)
+
+    println("thank you")
+
+
     for (scvc <- verifiedVCs) {
       println("I have already verified the following VC:")
       println(scvc)

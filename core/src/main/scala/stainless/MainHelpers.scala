@@ -59,12 +59,13 @@ trait MainHelpers extends inox.MainHelpers {
   )
 
   def main(args: Array[String]): Unit = try {
+    println("Hello world of course")
     val inoxCtx = setup(args)
     val compilerArgs = libraryFiles ++ args.toList.filterNot(_.startsWith("--"))
 
-    val (structure, program) = extractFromSource(inoxCtx, compilerArgs)
+    val (structure, program) = Bench.time("extractFromSource", extractFromSource(inoxCtx, compilerArgs))
     try {
-      program.symbols.ensureWellFormed
+      Bench.time("ensureWellFormed", program.symbols.ensureWellFormed)
     } catch {
       case e: program.symbols.TypeErrorException =>
         inoxCtx.reporter.error(e.pos, e.getMessage)
@@ -83,11 +84,13 @@ trait MainHelpers extends inox.MainHelpers {
       activeComponents
     }
 
-    for (c <- toExecute) c(structure, program).emit()
+    for (c <- toExecute) Bench.time(c + " emit", c(structure, program).emit())
 
     inoxCtx.reporter.whenDebug(inox.utils.DebugSectionTimers) { debug =>
       inoxCtx.timers.outputTable(debug)
     }
+
+    Bench.reportS()
   } catch {
     case _: inox.FatalError => System.exit(1)
   }
