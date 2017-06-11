@@ -51,26 +51,26 @@ trait InductionTactic extends DefaultTactic {
 
   override def generatePreconditions(id: Identifier): Seq[VC] = {
     val fd = getFunction(id)
-    (fd.body, firstSort(fd.params)) match {
+    (fd.body, Bench.time("firstSort", firstSort(fd.params))) match {
       case (Some(b), Some((tsort, arg))) =>
         val body = b
 
-        val calls = transformers.CollectorWithPC(program) {
+        val calls = Bench.time("collect calls", transformers.CollectorWithPC(program) {
           case (fi: FunctionInvocation, path) if fi.tfd.hasPrecondition => (fi, path)
-        }.collect(body)
+        }.collect(body))
 
         for {
           (fi @ FunctionInvocation(_, _, args), path) <- calls
           pre = fi.tfd.precondition.get
           tcons <- tsort.constructors
         } yield {
-          val selectors = selectorsOfParentType(tsort, tcons, arg.toVariable)
+          val selectors = Bench.time("selectors", selectorsOfParentType(tsort, tcons, arg.toVariable))
 
-          val subCases = selectors.map { sel =>
+          val subCases = Bench.time("subcases", selectors.map { sel =>
             exprOps.replace(Map(arg.toVariable -> sel),
               implies(fd.precOrTrue, fi.tfd.withParamSubst(args, pre))
             )
-          }
+          })
 
           val vc = path
             .withConds(Seq(IsInstanceOf(arg.toVariable, tcons.toType), fd.precOrTrue) ++ subCases)
@@ -87,7 +87,7 @@ trait InductionTactic extends DefaultTactic {
         if (body.isDefined) {
           ctx.reporter.warning(fd.getPos, "Could not find abstract class type argument to induct on")
         }
-        super.generatePreconditions(id)
+        Bench.time("super", super.generatePreconditions(id))
     }
   }
 }

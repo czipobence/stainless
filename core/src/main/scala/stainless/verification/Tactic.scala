@@ -11,9 +11,9 @@ trait Tactic {
   protected def VC(cond: program.trees.Expr, id: Identifier, kind: VCKind): VC = verification.VC(cond, id, kind)
 
   def generateVCs(id: Identifier): Seq[VC] = {
-    generatePostconditions(id) ++
-    generatePreconditions(id) ++
-    generateCorrectnessConditions(id)
+    Bench.time("postconditions", generatePostconditions(id)) ++
+    Bench.time("preconditions", generatePreconditions(id)) ++
+    Bench.time("correctness", generateCorrectnessConditions(id))
   }
 
   def generatePostconditions(id: Identifier): Seq[VC]
@@ -23,6 +23,7 @@ trait Tactic {
   protected def sizeLimit(s: String, limit: Int) = {
     require(limit > 3)
     // Crop the call to display it properly
+
     val res = s.takeWhile(_ != '\n').take(limit)
     if (res == s) {
       res

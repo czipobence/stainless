@@ -65,8 +65,8 @@ object VerificationComponent extends SimpleComponent {
   }
 
   def check(funs: Seq[Identifier], p: StainlessProgram): Map[VC[p.trees.type], VCResult[p.Model]] = {
-    val injector = AssertionInjector(p)
-    val encoder = inox.ast.ProgramEncoder(p)(injector)
+    val injector = Bench.time("assertion injector", AssertionInjector(p))
+    val encoder = Bench.time("encoder", inox.ast.ProgramEncoder(p)(injector))
 
     import encoder.targetProgram._
     import encoder.targetProgram.trees._

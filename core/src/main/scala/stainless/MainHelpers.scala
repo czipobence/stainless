@@ -59,7 +59,6 @@ trait MainHelpers extends inox.MainHelpers {
   )
 
   def main(args: Array[String]): Unit = try {
-    println("Hello world of course")
     val inoxCtx = setup(args)
     val compilerArgs = libraryFiles ++ args.toList.filterNot(_.startsWith("--"))
 
