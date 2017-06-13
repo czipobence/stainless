@@ -69,3 +69,6 @@ out-classes
 
 # verification conditions cache
 vccache.bin
+
+# kate
+*.kate-swp
