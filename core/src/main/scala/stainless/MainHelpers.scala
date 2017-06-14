@@ -84,7 +84,16 @@ trait MainHelpers extends inox.MainHelpers {
       activeComponents
     }
 
-    for (c <- toExecute) inox.Bench.time(c + " emit", c(structure, program).emit())
+    println(toExecute)
+
+    for (c <- toExecute) {
+      val s = structure
+      val p = program
+      println("entering cc")
+      val cc = inox.Bench.time("cc", c(s, p))
+      println("exiting cc")
+      inox.Bench.time("emit", cc.emit())
+    }
 
     inoxCtx.reporter.whenDebug(inox.utils.DebugSectionTimers) { debug =>
       inoxCtx.timers.outputTable(debug)

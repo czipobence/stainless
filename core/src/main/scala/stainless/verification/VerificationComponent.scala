@@ -14,10 +14,10 @@ object VerificationComponent extends SimpleComponent {
 
   type Report = VerificationReport
 
-  val lowering = inox.ast.SymbolTransformer(new ast.TreeTransformer {
+  val lowering = inox.Bench.time("lowering", inox.ast.SymbolTransformer(new ast.TreeTransformer {
     val s: extraction.trees.type = extraction.trees
     val t: extraction.trees.type = extraction.trees
-  })
+  }))
 
   implicit val debugSection = DebugSectionVerification
 
@@ -27,41 +27,46 @@ object VerificationComponent extends SimpleComponent {
 
     import program._
 
-    lazy val vrs = results.toSeq.sortBy { case (vc, _) => (vc.fd.name, vc.kind.toString) }
+    lazy val vrs = inox.Bench.time("vrs", results.toSeq.sortBy { case (vc, _) => (vc.fd.name, vc.kind.toString) })
 
-    lazy val totalConditions = vrs.size
-    lazy val totalTime = vrs.map(_._2.time.getOrElse(0l)).sum
-    lazy val totalValid = vrs.count(_._2.isValid)
-    lazy val totalInvalid = vrs.count(_._2.isInvalid)
-    lazy val totalUnknown = vrs.count(_._2.isInconclusive)
+    lazy val totalConditions = inox.Bench.time("conds", vrs.size)
+    lazy val totalTime = inox.Bench.time("time", vrs.map(_._2.time.getOrElse(0l)).sum)
+    lazy val totalValid = inox.Bench.time("valid", vrs.count(_._2.isValid))
+    lazy val totalInvalid = inox.Bench.time("invalid", vrs.count(_._2.isInvalid))
+    lazy val totalUnknown = inox.Bench.time("unknown", vrs.count(_._2.isInconclusive))
 
     def emit(): Unit = {
-      if (totalConditions > 0) {
-        var t = Table("Verification Summary")
+      inox.Bench.time("emitting", {
+        if (totalConditions > 0) {
+          var t = Table("Verification Summary")
 
-        t ++= vrs.map { case (vc, vr) =>
-          Row(Seq(
-            Cell(vc.fd),
-            Cell(vc.kind.name),
-            Cell(vc.getPos),
-            Cell(vr.status),
-            Cell(vr.solver.map(_.name).getOrElse("")),
-            Cell(vr.time.map(t => f"${t/1000d}%3.3f").getOrElse(""))
-          ))
+          t ++= vrs.map { case (vc, vr) =>
+            Row(
+              Seq(
+                Cell(vc.fd),
+                Cell(vc.kind.name),
+                Cell(vc.getPos),
+                Cell(vr.status),
+                Cell(vr.solver.map(_.name).getOrElse("")),
+                Cell(vr.time.map(t => f"${t / 1000d}%3.3f").getOrElse(""))
+              ))
+          }
+
+          t += Separator
+
+          t += Row(
+            Seq(
+              Cell(f"total: $totalConditions%-4d   valid: $totalValid%-4d   invalid: $totalInvalid%-4d   unknown: $totalUnknown%-4d", 5),
+              Cell(f"${totalTime / 1000d}%7.3f", align = Right)
+            ))
+
+          ctx.reporter.info(t.render)
+        } else {
+          ctx.reporter.info("No verification conditions were analyzed.")
         }
-
-        t += Separator
-
-        t += Row(Seq(
-          Cell(f"total: $totalConditions%-4d   valid: $totalValid%-4d   invalid: $totalInvalid%-4d   unknown: $totalUnknown%-4d", 5),
-          Cell(f"${totalTime/1000d}%7.3f", align = Right)
-        ))
-
-        ctx.reporter.info(t.render)
-      } else {
-        ctx.reporter.info("No verification conditions were analyzed.")
-      }
+      })
     }
+
   }
 
   def check(funs: Seq[Identifier], p: StainlessProgram): Map[VC[p.trees.type], VCResult[p.Model]] = {
@@ -94,11 +99,18 @@ object VerificationComponent extends SimpleComponent {
   }
 
   def apply(funs: Seq[Identifier], p: StainlessProgram): VerificationReport = {
-    val res = check(funs, p)
+    println("starting application")
+    val v = inox.Bench.time("apply", {
+      val res = inox.Bench.time("apply/check", check(funs, p))
 
-    new VerificationReport {
-      val program: p.type = p
-      val results = res
-    }
+      inox.Bench.time("verification report",
+      new VerificationReport {
+        val program: p.type = p
+        val results = res
+      }
+      )
+    })
+    println("ending application")
+    v
   }
 }

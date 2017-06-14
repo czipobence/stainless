@@ -217,7 +217,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
       }
     }
 
-    def encodeType(tpe: s.Type)(implicit scope: TypeScope): t.Expr = tpe match {
+    def encodeType(tpe: s.Type)(implicit scope: TypeScope): t.Expr = inox.Bench.time("encodeType", tpe match {
       case s.AnyType => top()
       case s.NothingType => bot()
       case s.ClassType(id, tps) => cls(IntegerLiteral(id.globalId), mkSeq(tps map encodeType))
@@ -238,7 +238,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
       case s.RealType => real()
       case s.StringType => str()
       case _ => scala.sys.error("Unexpected type " + tpe)
-    }
+    })
 
     val subtypeID = FreshIdentifier("isSubtypeOf")
     val subtypeOf = (e1: Expr, e2: Expr) => FunctionInvocation(subtypeID, Seq(), Seq(e1, e2))
@@ -448,7 +448,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
     val unificationCache: MutableMap[(t.Type, t.Type), t.FunDef] = MutableMap.empty
     def unificationFunctions: Seq[t.FunDef] = unificationCache.values.toSeq
 
-    def unifyTypes(e: t.Expr, tpe: t.Type, expected: t.Type): t.Expr = {
+    def unifyTypes(e: t.Expr, tpe: t.Type, expected: t.Type): t.Expr = inox.Bench.time("unifyTypes", {
 
       def containsObj(tpe: t.Type): Boolean = t.typeOps.exists { case `obj` => true case _ => false } (tpe)
 
@@ -555,7 +555,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
       }
 
       rec(e, tpe, expected)
-    }
+    })
 
 
     /* ====================================
@@ -691,7 +691,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
 
       def rewrite(id: Identifier): Boolean = functions(id).rewrite
 
-      private def isSimpleFunction(fun: s.FunAbstraction): Boolean = {
+      private def isSimpleFunction(fun: s.FunAbstraction): Boolean = inox.Bench.time("isSimpleFunction", {
         import symbols._
 
         var simple: Boolean = true
@@ -743,9 +743,9 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         traverser.traverse(fun.fullBody)
         fun.flags.foreach(traverser.traverse)
         simple
-      }
+      })
 
-      def withFunctions(funs: Seq[s.FunAbstraction]): Scope = {
+      def withFunctions(funs: Seq[s.FunAbstraction]): Scope = inox.Bench.time("withFunctions", {
         val funMap = funs.map(fun => fun.id -> fun).toMap
 
         var newGraph = graph
@@ -775,7 +775,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         })
 
         new Scope(newFunctions, tparams, newGraph)
-      }
+      })
 
       def in(id: Identifier): Scope = {
         val RewriteInfo(fun, _, vds) = functions(id)
@@ -783,7 +783,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         new Scope(functions, newTparams, graph)
       }
 
-      override def transform(e: s.Expr): t.Expr = e match {
+      override def transform(e: s.Expr): t.Expr = inox.Bench.time("trtransform", e match {
         case s.ClassConstructor(ct, args) =>
           choose(ValDef(FreshIdentifier("ptr", true), IntegerType, Set(Unchecked))) { res =>
             typeOf(res) === encodeType(ct) &&
@@ -869,9 +869,9 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
           t.LetRec(newFuns.map(_.toLocal), newBody).copiedFrom(e)
 
         case _ => super.transform(e)
-      }
+      })
 
-      private def transformPattern(scrut: s.Expr, pattern: s.Pattern): (t.Pattern, Option[t.Expr]) = {
+      private def transformPattern(scrut: s.Expr, pattern: s.Pattern): (t.Pattern, Option[t.Expr]) = inox.Bench.time("trPattern", {
         import symbols.{transform => _, _}
 
         def typePattern(tp: s.Type, variance: Option[Boolean]): (t.Pattern, t.Expr) = {
@@ -954,7 +954,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
           case t.BooleanLiteral(true) => None
           case _ => Some(cond)
         })
-      }
+      })
     }
 
     object Scope {
@@ -965,7 +965,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
       )
     }
 
-    def transformFunction(fd: s.FunAbstraction)(implicit scope: Scope): t.FunAbstraction = {
+    def transformFunction(fd: s.FunAbstraction)(implicit scope: Scope): t.FunAbstraction = inox.Bench.time("trFunction", {
       import s.TypeParameterWithBounds
       val scope0 = scope
 
@@ -1036,7 +1036,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
           fd.flags map scope.transform
         )
       }
-    }
+    })
 
     val symbolFuns = symbols.functions.values.map(s.Outer(_)).toSeq
     val baseScope = Scope.empty withFunctions symbolFuns
@@ -1079,22 +1079,23 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         case fi @ FunctionInvocation(`subtypeID`, Seq(), args @ (Seq(_: ADT, _) | Seq(_, _: ADT))) =>
           val tfd = fi.tfd
           val body = freshenLocals(tfd.withParamSubst(args, tfd.fullBody))
-          Some(inlineChecks(simplifyByConstructors(body)))
+          Some(inlineChecks(inox.Bench.time("twosimple",simplifyByConstructors(body))))
 
         case fi @ FunctionInvocation(`instanceID`, Seq(), args @ Seq(_, _: ADT)) =>
           val tfd = fi.tfd
           val body = freshenLocals(tfd.withParamSubst(args, tfd.fullBody))
-          Some(inlineChecks(simplifyByConstructors(body)))
+          Some(inlineChecks(inox.Bench.time("onesimple",simplifyByConstructors(body))))
         case _ => None
       } (e)
     }
 
-    val finalSymbols = NoSymbols
-      .withFunctions(newSymbols.functions.values.toSeq.map(fd => fd.copy(fullBody = inlineChecks(fd.fullBody))))
-      .withADTs(newSymbols.adts.values.toSeq)
+    val finalSymbols = inox.Bench.time("finalSymbols", NoSymbols
+      .withFunctions(newSymbols.functions.values.toSeq.map(fd => fd.copy(fullBody = inox.Bench.time("INLINECHECKING", inlineChecks(fd.fullBody)))))
+      .withADTs(newSymbols.adts.values.toSeq))
 
     for (fd <- finalSymbols.functions.values) {
       if (!finalSymbols.isSubtypeOf(fd.fullBody.getType(finalSymbols), fd.returnType)) {
+        println("subtype warning?")
         println(fd)
         println(finalSymbols.explainTyping(fd.fullBody)(PrinterOptions()))
       }
