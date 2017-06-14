@@ -11,9 +11,9 @@ trait Tactic {
   protected def VC(cond: program.trees.Expr, id: Identifier, kind: VCKind): VC = verification.VC(cond, id, kind)
 
   def generateVCs(id: Identifier): Seq[VC] = {
-    Bench.time("postconditions", generatePostconditions(id)) ++
-    Bench.time("preconditions", generatePreconditions(id)) ++
-    Bench.time("correctness", generateCorrectnessConditions(id))
+    inox.Bench.time("postconditions", generatePostconditions(id)) ++
+    inox.Bench.time("preconditions", generatePreconditions(id)) ++
+    inox.Bench.time("correctness", generateCorrectnessConditions(id))
   }
 
   def generatePostconditions(id: Identifier): Seq[VC]

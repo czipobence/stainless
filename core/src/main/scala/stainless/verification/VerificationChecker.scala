@@ -56,10 +56,10 @@ trait VerificationChecker { self =>
 
     try {
       ctx.reporter.debug("Generating Verification Conditions...")
-      val vcs = Bench.time("generating vcs", generateVCs(funs))
+      val vcs = inox.Bench.time("generating vcs", generateVCs(funs))
 
       ctx.reporter.debug("Checking Verification Conditions...")
-      Bench.time("checking vcs", checkVCs(vcs, sf, stopWhen))
+      inox.Bench.time("checking vcs", checkVCs(vcs, sf, stopWhen))
     } finally {
       sf.shutdown()
     }
@@ -71,7 +71,7 @@ trait VerificationChecker { self =>
       val tactic = getTactic(fd)
 
       if (fd.body.isDefined) {
-        Bench.time("generating", tactic.generateVCs(id))
+        inox.Bench.time("generating", tactic.generateVCs(id))
       } else {
         Nil
       }
@@ -127,7 +127,7 @@ trait VerificationChecker { self =>
     var stop = false
 
     val initMap: Map[VC, VCResult] = vcs.map(vc => vc -> unknownResult).toMap
-    val verifiedVCs: Set[SCVC] = if (vccache) Bench.time("getVerifiedVCS", getVerifiedVCs()) else Set()
+    val verifiedVCs: Set[SCVC] = if (vccache) inox.Bench.time("getVerifiedVCS", getVerifiedVCs()) else Set()
 
     println("the whole program")
 
@@ -146,7 +146,7 @@ trait VerificationChecker { self =>
       if (vccache && verifiedVCs.contains(selfContained(vc,program)))
         VCResult(VCStatus.Valid, None, Some(0))
       else
-        Bench.time("checking VC", checkVC(vc,sf))
+        inox.Bench.time("checking VC", checkVC(vc,sf))
     }
 
     // scala doesn't seem to have a nice common super-type of vcs and vcs.par, so these
@@ -200,8 +200,8 @@ trait VerificationChecker { self =>
     val s = sf.getNewSolver
 
     try {
-      val cond_aux = Bench.time("simplifyLets", simplifyLets(vc.condition))
-      val cond = Bench.time("removals", removeUnusedLets(removeAsserts(cond_aux)))
+      val cond_aux = inox.Bench.time("simplifyLets", simplifyLets(vc.condition))
+      val cond = inox.Bench.time("removals", removeUnusedLets(removeAsserts(cond_aux)))
       ctx.reporter.synchronized {
         ctx.reporter.info(s" - Now considering '${vc.kind}' VC for ${vc.fd} @${vc.getPos}...")
         ctx.reporter.debug(cond.asString)
@@ -213,7 +213,7 @@ trait VerificationChecker { self =>
       val vcres = try {
         s.assertCnstr(Not(cond))
 
-        val res = Bench.time("model checking", s.check(Model))
+        val res = inox.Bench.time("model checking", s.check(Model))
 
         val time = timer.stop()
 
