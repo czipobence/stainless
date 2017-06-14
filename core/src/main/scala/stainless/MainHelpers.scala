@@ -3,6 +3,7 @@
 package stainless
 
 import extraction.xlang.{trees => xt}
+import inox.Bench
 
 object MainHelpers {
   val components: Seq[Component] = Seq(
@@ -62,9 +63,9 @@ trait MainHelpers extends inox.MainHelpers {
     val inoxCtx = setup(args)
     val compilerArgs = libraryFiles ++ args.toList.filterNot(_.startsWith("--"))
 
-    val (structure, program) = Bench.time("extractFromSource", extractFromSource(inoxCtx, compilerArgs))
+    val (structure, program) = inox.Bench.time("extractFromSource", extractFromSource(inoxCtx, compilerArgs))
     try {
-      Bench.time("ensureWellFormed", program.symbols.ensureWellFormed)
+      inox.Bench.time("ensureWellFormed", program.symbols.ensureWellFormed)
     } catch {
       case e: program.symbols.TypeErrorException =>
         inoxCtx.reporter.error(e.pos, e.getMessage)
@@ -83,7 +84,7 @@ trait MainHelpers extends inox.MainHelpers {
       activeComponents
     }
 
-    for (c <- toExecute) Bench.time(c + " emit", c(structure, program).emit())
+    for (c <- toExecute) inox.Bench.time(c + " emit", c(structure, program).emit())
 
     inoxCtx.reporter.whenDebug(inox.utils.DebugSectionTimers) { debug =>
       inoxCtx.timers.outputTable(debug)

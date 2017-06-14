@@ -4,7 +4,7 @@ package stainless
 package extraction
 package inlining
 
-import stainless.Bench
+import inox.Bench
 
 object optInlinePosts extends inox.FlagOptionDef("inlineposts", false)
 
@@ -67,7 +67,7 @@ trait FunctionInlining extends inox.ast.SymbolTransformer { self =>
           None
         } else {
           Some(transformer.transform(fd.copy(
-            fullBody = Bench.time("inlineFunctionInvocations", inlineFunctionInvocations(fd.fullBody)),
+            fullBody = inox.Bench.time("inlineFunctionInvocations", inlineFunctionInvocations(fd.fullBody)),
             flags = fd.flags - Inline
           )))
         }

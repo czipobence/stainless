@@ -65,14 +65,14 @@ object VerificationComponent extends SimpleComponent {
   }
 
   def check(funs: Seq[Identifier], p: StainlessProgram): Map[VC[p.trees.type], VCResult[p.Model]] = {
-    val injector = Bench.time("assertion injector", AssertionInjector(p))
-    val encoder = Bench.time("encoder", inox.ast.ProgramEncoder(p)(injector))
+    val injector = inox.Bench.time("assertion injector", AssertionInjector(p))
+    val encoder = inox.Bench.time("encoder", inox.ast.ProgramEncoder(p)(injector))
 
     import encoder.targetProgram._
     import encoder.targetProgram.trees._
     import encoder.targetProgram.symbols._
 
-    Bench.time("check", {
+    inox.Bench.time("check", {
 
       val toVerify = funs.sortBy(getFunction(_).getPos)
 
@@ -83,7 +83,7 @@ object VerificationComponent extends SimpleComponent {
         }
       }
 
-      Bench.time("verificationChecker", {
+      inox.Bench.time("verificationChecker", {
         VerificationChecker.verify(encoder.targetProgram)(funs).mapValues {
           case VCResult(VCStatus.Invalid(model), s, t) =>
             VCResult(VCStatus.Invalid(model.encode(encoder.reverse)), s, t)

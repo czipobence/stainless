@@ -24,15 +24,15 @@ trait DefaultTactic extends Tactic {
   def generatePreconditions(id: Identifier): Seq[VC] = {
     val fd = getFunction(id)
 
-    val calls = Bench.time("getting calls", transformers.CollectorWithPC(program) {
+    val calls = inox.Bench.time("getting calls", transformers.CollectorWithPC(program) {
       case (fi: FunctionInvocation, path) if fi.tfd.precondition.isDefined => (fi, path)
     }.collect(fd.fullBody))
 
-    Bench.time("mapping",
+    inox.Bench.time("mapping",
     calls.map { case (fi @ FunctionInvocation(_, _, args), path) =>
-      val pre = Bench.time("preing", fi.tfd.withParamSubst(args, fi.tfd.precondition.get))
-      val vc = Bench.time("implying", path implies pre)
-      val fiS = Bench.time("sizelimitting", sizeLimit(fi.asString, 40))
+      val pre = inox.Bench.time("preing", fi.tfd.withParamSubst(args, fi.tfd.precondition.get))
+      val vc = inox.Bench.time("implying", path implies pre)
+      val fiS = inox.Bench.time("sizelimitting", sizeLimit(fi.asString, 40))
       VC(vc, id, VCKind.Info(VCKind.Precondition, s"call $fiS")).setPos(fi)
     })
   }
