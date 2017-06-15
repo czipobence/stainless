@@ -1061,36 +1061,50 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         objCons
       ) ++ adts)
 
-    def inlineChecks(e: Expr): Expr = {
+    def inlineChecks(e: Expr, s: String): Expr = {
       import newSymbols._
       import exprOps._
 
-      exprOps.postMap {
-        case fi @ FunctionInvocation(`subtypeID`, Seq(), Seq(
-          ADT(`tpl`, Seq(ADTSelector(_, `tail`))),
-          ADT(`tpl`, Seq(ADTSelector(_, `tail`)))
-        )) => None
+//      simplifyByConstructors(e)
+        exprOps.postMap { e => {
+//          if (s == "compose") {
+//          println("cursing")
+//          println(e)
+//          }
+          e match {
+            case fi@FunctionInvocation(`subtypeID`, Seq(), Seq(
+            ADT(`tpl`, Seq(ADTSelector(_, `tail`))),
+            ADT(`tpl`, Seq(ADTSelector(_, `tail`)))
+            )) => None
 
-        case fi @ FunctionInvocation(`subtypeID`, Seq(), Seq(
-          ADT(`fun`, Seq(ADTSelector(_, `tail`), _)),
-          ADT(`fun`, Seq(ADTSelector(_, `tail`), _))
-        )) => None
+            case fi@FunctionInvocation(`subtypeID`, Seq(), Seq(
+            ADT(`fun`, Seq(ADTSelector(_, `tail`), _)),
+            ADT(`fun`, Seq(ADTSelector(_, `tail`), _))
+            )) => None
 
-        case fi @ FunctionInvocation(`subtypeID`, Seq(), args @ (Seq(_: ADT, _) | Seq(_, _: ADT))) =>
-          val tfd = fi.tfd
-          val body = freshenLocals(tfd.withParamSubst(args, tfd.fullBody))
-          Some(inlineChecks(inox.Bench.time("twosimple",simplifyByConstructors(body))))
+            case fi@FunctionInvocation(`subtypeID`, Seq(), args@(Seq(_: ADT, _) | Seq(_, _: ADT))) =>
+//              println("MATCHING FOUND")
+//              println(fi)
+              val tfd = fi.tfd
+              val body = freshenLocals(tfd.withParamSubst(args, tfd.fullBody))
+//              println("new body (two)")
+//              println(body)
+//              println("===============")
+              Some(inlineChecks(inox.Bench.time("twosimple", simplifyByConstructors(body)), s))
 
-        case fi @ FunctionInvocation(`instanceID`, Seq(), args @ Seq(_, _: ADT)) =>
-          val tfd = fi.tfd
-          val body = freshenLocals(tfd.withParamSubst(args, tfd.fullBody))
-          Some(inlineChecks(inox.Bench.time("onesimple",simplifyByConstructors(body))))
-        case _ => None
-      } (e)
+            case fi@FunctionInvocation(`instanceID`, Seq(), args@Seq(_, _: ADT)) =>
+              val tfd = fi.tfd
+              val body = freshenLocals(tfd.withParamSubst(args, tfd.fullBody))
+//              println("new body (one)")
+//              println(body)
+//              println("===============")
+              Some(inlineChecks(inox.Bench.time("onesimple", simplifyByConstructors(body)), s))
+            case _ => None
+          }}} (e)
     }
 
     val finalSymbols = inox.Bench.time("finalSymbols", NoSymbols
-      .withFunctions(newSymbols.functions.values.toSeq.map(fd => fd.copy(fullBody = inox.Bench.time("INLINECHECKING", inlineChecks(fd.fullBody)))))
+      .withFunctions(newSymbols.functions.values.toSeq.map(fd => fd.copy(fullBody = inox.Bench.time("inlinechecking: " + fd.id.name, inlineChecks(fd.fullBody,fd.id.name) ))))
       .withADTs(newSymbols.adts.values.toSeq))
 
     for (fd <- finalSymbols.functions.values) {
