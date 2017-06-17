@@ -1083,22 +1083,31 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
             )) => None
 
             case fi@FunctionInvocation(`subtypeID`, Seq(), args@(Seq(_: ADT, _) | Seq(_, _: ADT))) =>
-//              println("MATCHING FOUND")
-//              println(fi)
+              println("MATCHING FOUND (two)")
+              println(fi)
+              println(fi.tfd)
+              println("ARGUMENTS")
+              println(args)
               val tfd = fi.tfd
-              val body = freshenLocals(tfd.withParamSubst(args, tfd.fullBody))
-//              println("new body (two)")
-//              println(body)
-//              println("===============")
-              Some(inlineChecks(inox.Bench.time("twosimple", simplifyByConstructors(body)), s))
+              val body = simplifyByConstructors(freshenLocals(tfd.withParamSubst(args, tfd.fullBody)))
+              println("new body (two)")
+              println(body)
+              println("===============")
+              Some(inlineChecks(inox.Bench.time("twosimple", (body)), s))
 
             case fi@FunctionInvocation(`instanceID`, Seq(), args@Seq(_, _: ADT)) =>
               val tfd = fi.tfd
-              val body = freshenLocals(tfd.withParamSubst(args, tfd.fullBody))
-//              println("new body (one)")
-//              println(body)
-//              println("===============")
-              Some(inlineChecks(inox.Bench.time("onesimple", simplifyByConstructors(body)), s))
+              val body = simplifyByConstructors(freshenLocals(tfd.withParamSubst(args, tfd.fullBody)))
+              println("MATCHING FOUND (one)")
+              println(fi)
+              println(fi.tfd)
+              println(fi.tfd.fullBody)
+              println("ARGUMENTS")
+              println(args)
+              println("new body (one)")
+              println(body)
+              println("===============")
+              Some(inlineChecks(inox.Bench.time("onesimple", (body)), s))
             case _ => None
           }}} (e)
     }
