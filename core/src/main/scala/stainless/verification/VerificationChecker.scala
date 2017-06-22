@@ -84,38 +84,43 @@ trait VerificationChecker { self =>
     ))
   }
 
-  // Self-Contained VC: stores all functions definitions needed for this VC
-  // FIXME: for soundness, we should also store all subtypes of the ADTs
-  // FIXME: e.g. caching e.isInstanceOf(A) || e.isInstanceOf(B) is not sound if we add "case class C extends T"
-  // FIXME: with e of type T, and case class A extends T, and case class B extends T.
-  type SCVC = String
-  def selfContained(vc: VC, program: self.program.type): SCVC = {
-    val callees = exprOps.functionCallsOf(vc.condition).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
-    val types: Set[String] = exprOps.collect {
-      case e => e.getType match {
-        case a @ ADTType(_,_) => Set(a.getADT.toString)
-        case _ => Set[String]()
-      }
-    } (vc.condition)
+  // Self-Contained VC: stores all functions and type definitions needed for this VC
+  // When Stainless supports the syntax "type A = B", this function should be updated.
+  def selfContained(vc: VC, program: self.program.type): String = {
 
-    vc.condition.toString +
+    val callees = exprOps.functionCallsOf(vc.condition).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
+    val uniq = new PrinterOptions(printUniqueIds = true)
+
+    var types = Set[String]()
+    
+    new TreeTraverser {
+      override def traverse(tpe: Type): Unit = {
+        tpe match {
+          case adt: ADTType => types += getADT(adt.id).asString(uniq)
+          case _ => ()
+        }
+        super.traverse(tpe)
+      }
+    }.traverse(vc.condition)
+
+    vc.condition.asString(uniq) +
       "\n\nFunction Definitions\n\n" +
-      callees.toList.sorted.mkString("\n\n") +
-      "\n\nType Definitions:\n\n" +
+      callees.map(_.asString(uniq)).toList.sorted.mkString("\n\n") +
+      "\n\nADTs Definitions:\n\n" +
       types.toList.sorted.mkString("\n\n")
   }
 
-  def getVerifiedVCs(): Set[SCVC] = {
+  def getVerifiedVCs(): Set[String] = {
     if (new java.io.File(cacheFile).exists) {
       val ois = new ObjectInputStream(new FileInputStream(cacheFile))
-      val verifiedVCs = ois.readObject.asInstanceOf[Set[SCVC]]
+      val verifiedVCs = ois.readObject.asInstanceOf[Set[String]]
       ois.close()
       verifiedVCs
     }
     else Set()
   }
 
-  def writeVerifiedVCs(vcs: Set[SCVC]) = {
+  def writeVerifiedVCs(vcs: Set[String]) = {
     val oos = new ObjectOutputStream(new FileOutputStream(cacheFile))
     oos.writeObject(vcs)
     oos.close()
@@ -127,18 +132,20 @@ trait VerificationChecker { self =>
     var stop = false
 
     val initMap: Map[VC, VCResult] = vcs.map(vc => vc -> unknownResult).toMap
-    val verifiedVCs: Set[SCVC] = if (vccache) inox.Bench.time("getVerifiedVCS", getVerifiedVCs()) else Set()
+    val verifiedVCs: Set[String] = if (vccache) inox.Bench.time("getVerifiedVCS", getVerifiedVCs()) else Set()
 
 
-    for (scvc <- verifiedVCs) {
-      println("I have already verified the following VC:")
-      println(scvc)
-      println("==============================================")
+    for (vc <- verifiedVCs) {
     }
 
     def checkVCWithCache(vc: VC, sf: SolverFactory { val program: self.program.type }) = {
-      if (vccache && verifiedVCs.contains(selfContained(vc,program)))
+      val scvc = selfContained(vc,program)
+      if (vccache && verifiedVCs.contains(scvc)) {
+        println("I have already verified the following VC:")
+        println(scvc)
+        println("==============================================")
         VCResult(VCStatus.Valid, None, Some(0))
+      } 
       else
         inox.Bench.time("checking VC", checkVC(vc,sf))
     }
@@ -162,7 +169,7 @@ trait VerificationChecker { self =>
     }
 
     if (vccache) {
-      val newVerifiedVCs: Set[SCVC] = Set[SCVC]() ++
+      val newVerifiedVCs: Set[String] = Set[String]() ++
         results.
           filter { case (vc, res) => res.isValid }.
           map { case (vc, res) => selfContained(vc,program) }

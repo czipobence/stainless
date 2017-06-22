@@ -130,7 +130,6 @@ object VerificationComponent extends SimpleComponent {
   }
 
   def apply(funs: Seq[Identifier], p: StainlessProgram): VerificationReport = {
-    println("starting application")
     val v = inox.Bench.time("apply", {
       val res = inox.Bench.time("apply/check", check(funs, p))
 
@@ -141,7 +140,6 @@ object VerificationComponent extends SimpleComponent {
       }
       )
     })
-    println("ending application")
     v
   }
 }
