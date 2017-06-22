@@ -46,11 +46,7 @@ trait SimpleComponent extends Component { self =>
       (l, r) => l.lowering andThen r
     }
 
-<<<<<<< HEAD
-    inox.Bench.time("transforming", program.transform(extraction.extractor andThen lowering))
-=======
     extraction.extract(program).transform(lowering)
->>>>>>> f9aff1428512669ccd431b827a501094a45a62aa
   }
 
   def apply(units: List[xt.UnitDef], program: Program { val trees: xt.type }): Report = {
