@@ -87,27 +87,33 @@ trait VerificationChecker { self =>
   // Self-Contained VC: stores all functions and type definitions needed for this VC
   // When Stainless supports the syntax "type A = B", this function should be updated.
   def selfContained(vc: VC, program: self.program.type): String = {
+    val uniq = PrinterOptions(printUniqueIds = true)
 
-    val callees = exprOps.functionCallsOf(vc.condition).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
-    val uniq = new PrinterOptions(printUniqueIds = true)
-
-    var types = Set[String]()
+    var adts = Set[ADTDefinition]()
     
     new TreeTraverser {
       override def traverse(tpe: Type): Unit = {
         tpe match {
-          case adt: ADTType => types += getADT(adt.id).asString(uniq)
+          case adt: ADTType => adts += getADT(adt.id)
           case _ => ()
         }
         super.traverse(tpe)
       }
     }.traverse(vc.condition)
 
+    val adtInvariants: Set[FunDef] = adts.flatMap(_.invariant)
+    val invariantsBodies = adtInvariants.map(_.fullBody)
+
+    val callees = 
+      (invariantsBodies + vc.condition).flatMap(e =>
+        exprOps.functionCallsOf(e).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
+      ) ++ adtInvariants
+
     vc.condition.asString(uniq) +
       "\n\nFunction Definitions\n\n" +
       callees.map(_.asString(uniq)).toList.sorted.mkString("\n\n") +
       "\n\nADTs Definitions:\n\n" +
-      types.toList.sorted.mkString("\n\n")
+      adts.map(_.asString(uniq)).toList.sorted.mkString("\n\n")
   }
 
   def getVerifiedVCs(): Set[String] = {
@@ -121,6 +127,10 @@ trait VerificationChecker { self =>
   }
 
   def writeVerifiedVCs(vcs: Set[String]) = {
+    for (vc <- vcs) {
+      println("Saving VC")
+      println(vc)
+    }
     val oos = new ObjectOutputStream(new FileOutputStream(cacheFile))
     oos.writeObject(vcs)
     oos.close()

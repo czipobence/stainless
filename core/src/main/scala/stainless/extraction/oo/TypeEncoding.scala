@@ -1061,59 +1061,8 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         objCons
       ) ++ adts)
 
-    def inlineChecks(e: Expr, s: String): Expr = {
-      import newSymbols._
-      import exprOps._
-
-//      simplifyByConstructors(e)
-        exprOps.postMap { e => {
-//          if (s == "compose") {
-//          println("cursing")
-//          println(e)
-//          }
-          e match {
-            case fi@FunctionInvocation(`subtypeID`, Seq(), Seq(
-            ADT(`tpl`, Seq(ADTSelector(_, `tail`))),
-            ADT(`tpl`, Seq(ADTSelector(_, `tail`)))
-            )) => None
-
-            case fi@FunctionInvocation(`subtypeID`, Seq(), Seq(
-            ADT(`fun`, Seq(ADTSelector(_, `tail`), _)),
-            ADT(`fun`, Seq(ADTSelector(_, `tail`), _))
-            )) => None
-
-            case fi@FunctionInvocation(`subtypeID`, Seq(), args@(Seq(_: ADT, _) | Seq(_, _: ADT))) =>
-              println("MATCHING FOUND (two)")
-              println(fi)
-              println(fi.tfd)
-              println("ARGUMENTS")
-              println(args)
-              val tfd = fi.tfd
-              val body = simplifyByConstructors(freshenLocals(tfd.withParamSubst(args, tfd.fullBody)))
-              println("new body (two)")
-              println(body)
-              println("===============")
-              Some(inlineChecks(inox.Bench.time("twosimple", (body)), s))
-
-            case fi@FunctionInvocation(`instanceID`, Seq(), args@Seq(_, _: ADT)) =>
-              val tfd = fi.tfd
-              val body = simplifyByConstructors(freshenLocals(tfd.withParamSubst(args, tfd.fullBody)))
-              println("MATCHING FOUND (one)")
-              println(fi)
-              println(fi.tfd)
-              println(fi.tfd.fullBody)
-              println("ARGUMENTS")
-              println(args)
-              println("new body (one)")
-              println(body)
-              println("===============")
-              Some(inlineChecks(inox.Bench.time("onesimple", (body)), s))
-            case _ => None
-          }}} (e)
-    }
-
     val finalSymbols = inox.Bench.time("finalSymbols", NoSymbols
-      .withFunctions(newSymbols.functions.values.toSeq.map(fd => fd.copy(fullBody = inox.Bench.time("inlinechecking: " + fd.id.name, inlineChecks(fd.fullBody,fd.id.name) ))))
+      .withFunctions(newSymbols.functions.values.toSeq)
       .withADTs(newSymbols.adts.values.toSeq))
 
     for (fd <- finalSymbols.functions.values) {
