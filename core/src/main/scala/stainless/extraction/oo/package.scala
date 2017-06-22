@@ -3,6 +3,8 @@
 package stainless
 package extraction
 
+import scala.language.existentials
+
 package object oo {
 
   object trees extends Trees with ClassSymbols {
@@ -31,4 +33,5 @@ package object oo {
   }
 
   val extractor = methods andThen adts andThen encoding
+
 }
