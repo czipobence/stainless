@@ -19,6 +19,7 @@ trait DefaultTactic extends Tactic {
         case m @ MatchCase(pattern, optGuard, rhs) => MatchCase(pattern, optGuard, ensuring(rhs, lambda)).copiedFrom(m)
       }
       MatchExpr(scrutinee, newCases).copiedFrom(e)
+    case Require(pred, body) => Require(pred, ensuring(body,lambda)).copiedFrom(e)
     case _ => Ensuring(e, lambda).copiedFrom(e)
   }
 
@@ -31,6 +32,8 @@ trait DefaultTactic extends Tactic {
 
   def generatePostconditions(id: Identifier): Seq[VC] = {
     val body = pushDownEnsuring(getFunction(id).fullBody)
+    // println("Pushed down ensuring")
+    // println(body.asString(PrinterOptions(printUniqueIds = true)))
     transformers.CollectorWithPC(program) {
       case (e @ Ensuring(body, lambda), path) =>
         val vc = path implies application(lambda, Seq(body))

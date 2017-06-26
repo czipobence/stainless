@@ -108,9 +108,11 @@ trait Definitions extends extraction.Trees { self: Trees =>
     def getClass(id: Identifier, tps: Seq[Type]): TypedClassDef = lookupClass(id, tps).getOrElse(throw ClassLookupException(id))
 
     override def asString(implicit opts: PrinterOptions): String = {
+      inox.Bench.time("asString stainless", {
       classes.map(p => prettyPrint(p._2, opts)).mkString("\n\n") +
         "\n\n-----------\n\n" +
         super.asString
+      })
     }
 
     override def transform(t: inox.ast.TreeTransformer { val s: self.type }): t.t.Symbols = t.t match {
