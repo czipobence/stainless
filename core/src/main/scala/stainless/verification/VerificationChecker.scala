@@ -115,7 +115,6 @@ trait VerificationChecker { self =>
       val vcString = vc.condition.serialize
       vcs.contains(vcString) && {
 
-
         var adts = Set[(Identifier,ADTDefinition)]()
         
         inox.Bench.time("gathering adts", {
@@ -142,14 +141,30 @@ trait VerificationChecker { self =>
           )
         })
 
+        ctx.reporter.synchronized {
+          ctx.reporter.debug("Checking containment of VC")
+          ctx.reporter.debug(vc)
+          ctx.reporter.debug("Program functions for the VC")
+          for (fd <- callees) {
+            ctx.reporter.debug(fd)
+            ctx.reporter.debug("\n\n")
+          }
+          ctx.reporter.debug("ADT definitions for the VC")
+          for (a <- adts) {
+            ctx.reporter.debug(a)
+            ctx.reporter.debug("\n\n")
+          }
+        }
+
+
         adts.forall { 
           case (id,a) =>
-            val idser = id.serialize
-            programADTs.contains(idser) && programADTs(idser) == a.serialize
+            val serializedID = id.serialize
+            programADTs.contains(serializedID) && programADTs(serializedID) == a.serialize
         } &&
         callees.forall { fd =>
-          val idser = fd.id.serialize
-          funs.contains(idser) && funs(idser) == fd.serialize()
+          val serializedID = fd.id.serialize
+          funs.contains(serializedID) && funs(serializedID) == fd.serialize
         }
         
       }
@@ -170,13 +185,6 @@ trait VerificationChecker { self =>
   }
 
   def writeVerifiedVCs(v: VerifiedVCs) = {
-    for (vc <- v.vcs) {
-      ctx.reporter.synchronized {
-        ctx.reporter.debug("Saving the following VC to disk")
-        ctx.reporter.debug(vc)
-        ctx.reporter.debug("--------------")
-      }
-    }
     val oos = new ObjectOutputStream(new FileOutputStream(cacheFile))
     oos.writeObject((v.funs, v.programADTs, v.vcs))
     oos.close()
