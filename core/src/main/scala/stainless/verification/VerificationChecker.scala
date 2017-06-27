@@ -354,6 +354,12 @@ object VerificationChecker {
           defaultTactic
         }
 
+      val simpleP = new inox.Program {
+        val trees = p.trees
+        val symbols = transformers.ProgramSimplifier.transform(p.symbols)
+        val ctx = p.ctx
+      }
+
       protected def getFactory = solvers.SolverFactory.apply(p, opts)
     }
 
