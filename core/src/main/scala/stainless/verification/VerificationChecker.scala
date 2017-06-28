@@ -18,6 +18,9 @@ object DebugSectionVerification extends inox.DebugSection("verification")
 
 trait VerificationChecker { self =>
   val program: Program
+  //val transAfterTactic = IdentityTransformer
+//  final val program2: Program = transAfterTactic.transform(program)
+  val program2: Program { val trees: self.program.trees.type }
   val options: inox.Options
 
   private lazy val parallelCheck = options.findOptionOrDefault(optParallelVCs)
@@ -35,15 +38,15 @@ trait VerificationChecker { self =>
   type VC = verification.VC[program.trees.type]
   val VC = verification.VC
 
-  type VCStatus = verification.VCStatus[program.Model]
+  type VCStatus = verification.VCStatus[program2.Model]
 
-  type VCResult = verification.VCResult[program.Model]
+  type VCResult = verification.VCResult[program2.Model]
   val VCResult = verification.VCResult
 
   protected def getTactic(fd: FunDef): Tactic { val program: self.program.type }
   protected def getFactory: SolverFactory {
-    val program: self.program.type
-    type S <: inox.solvers.combinators.TimeoutSolver { val program: self.program.type }
+    val program: self.program2.type
+    type S <: inox.solvers.combinators.TimeoutSolver { val program: self.program2.type }
   }
 
   private def defaultStop(res: VCResult): Boolean = if (failEarly) res.status != VCStatus.Valid else false
@@ -192,13 +195,13 @@ trait VerificationChecker { self =>
 
   private lazy val unknownResult: VCResult = VCResult(VCStatus.Unknown, None, None)
 
-  def checkVCs(vcs: Seq[VC], sf: SolverFactory { val program: self.program.type }, stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
+  def checkVCs(vcs: Seq[VC], sf: SolverFactory { val program: self.program2.type }, stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
     var stop = false
 
     val initMap: Map[VC, VCResult] = vcs.map(vc => vc -> unknownResult).toMap
     val verifiedVCs = inox.Bench.time("getVerifiedVCS", getVerifiedVCs())
 
-    def checkVCWithCache(vc: VC, sf: SolverFactory { val program: self.program.type }) = inox.Bench.time("check vc with cache", {
+    def checkVCWithCache(vc: VC, sf: SolverFactory { val program: self.program2.type }) = inox.Bench.time("check vc with cache", {
       if (vccache && verifiedVCs.contains(vc,program)) {
         ctx.reporter.synchronized {
           ctx.reporter.debug("The following VC has already been verified:")
@@ -263,7 +266,7 @@ trait VerificationChecker { self =>
     }, applyRec=true)(e)
   }
 
-  private def checkVC(vc: VC, sf: SolverFactory { val program: self.program.type }): VCResult = {
+  private def checkVC(vc: VC, sf: SolverFactory { val program: self.program2.type }): VCResult = {
     import SolverResponses._
     val s = sf.getNewSolver
 
@@ -338,11 +341,20 @@ trait VerificationChecker { self =>
 }
 
 object VerificationChecker {
+
   def verify(p: StainlessProgram, opts: inox.Options)
             (funs: Seq[Identifier]): Map[VC[p.trees.type], VCResult[p.Model]] = {
+
     object checker extends VerificationChecker {
+
       val program: p.type = p
       val options = opts
+
+      object ps extends transformers.ProgramSimplifier {
+        val trees: p.trees.type = p.trees
+      }
+      val simpleP: StainlessProgram = p.transform(ps)
+      val program2: simpleP.type = simpleP
 
       val defaultTactic = DefaultTactic(p)
       val inductionTactic = InductionTactic(p)
@@ -353,14 +365,7 @@ object VerificationChecker {
         } else {
           defaultTactic
         }
-
-      val simpleP = new inox.Program {
-        val trees = p.trees
-        val symbols = transformers.ProgramSimplifier.transform(p.symbols)
-        val ctx = p.ctx
-      }
-
-      protected def getFactory = solvers.SolverFactory.apply(p, opts)
+      protected def getFactory = solvers.SolverFactory.apply(program2, opts)
     }
 
     checker.verify(funs)

@@ -105,7 +105,7 @@ trait MainHelpers extends inox.MainHelpers {
       inoxCtx.timers.outputTable(debug)
     }
 
-    Bench.reportS()
+//    Bench.reportS()
     
     def exportJson(file: String): Unit = {
       inoxCtx.reporter.info(s"Outputing JSON summary to $file")
