@@ -17,10 +17,10 @@ object VerificationComponent extends SimpleComponent {
   val description = "Verification of function contracts"
 
   /**
-   * Strict Arithmetic Mode:
-   *
-   * Add assertions for integer overflow checking and other unexpected behaviour (e.g. x << 65).
-   */
+    * Strict Arithmetic Mode:
+    *
+    * Add assertions for integer overflow checking and other unexpected behaviour (e.g. x << 65).
+    */
   val optStrictArithmetic = inox.FlagOptionDef("strictarithmetic", false)
 
   val trees: stainless.trees.type = stainless.trees
@@ -34,7 +34,7 @@ object VerificationComponent extends SimpleComponent {
 
   implicit val debugSection = DebugSectionVerification
 
-  trait VerificationReport extends AbstractReport { self =>
+  trait  VerificationReport extends AbstractReport { self =>
     val program: Program { val trees: stainless.trees.type }
     val results: Map[VC[program.trees.type], VCResult[program.Model]]
 
@@ -100,6 +100,15 @@ object VerificationComponent extends SimpleComponent {
     }
   }
 
+
+  def changeModelProgram(model: inox.Model)(newProgram: inox.Program { val trees: model.program.trees.type }): inox.Model { val program: newProgram.type } = {
+    new inox.Model {
+      val program: newProgram.type = newProgram
+      val vars = model.vars
+      val chooses = model.chooses
+    }
+  }
+
   def check(funs: Seq[Identifier], p: StainlessProgram): Map[VC[p.trees.type], VCResult[p.Model]] = {
     val injector = inox.Bench.time("assertion injector", AssertionInjector(p))
     val encoder = inox.Bench.time("encoder", inox.ast.ProgramEncoder(p)(injector))
@@ -120,14 +129,13 @@ object VerificationComponent extends SimpleComponent {
       }
 
       inox.Bench.time("verificationChecker", {
-        val p = encoder.targetProgram
         val vcs1 = VerificationGenerator.gen(encoder.targetProgram)(funs)
-        val (p2, modifiers) = transformers.ProgramSimplifier.simplify(p)
-        val vcs2 = transformers.ProgramSimplifier.transformVCs(vcs1, modifiers)
-        
-        VerificationChecker.verify(p2)(vcs2).mapValues {
+        val (simpleProgram, vcs2) = transformers.ProgramSimplifier.simplify(encoder.targetProgram)(vcs1)
+
+        VerificationChecker.verify(simpleProgram)(vcs2).mapValues {
           case VCResult(VCStatus.Invalid(model), s, t) =>
-            VCResult(VCStatus.Invalid(model.encode(encoder.reverse)), s, t)
+            val originalModel = changeModelProgram(model)(encoder.targetProgram)
+            VCResult(VCStatus.Invalid(originalModel.encode(encoder.reverse)), s, t)
           case res => res.asInstanceOf[VCResult[p.Model]]
         }
       })
@@ -139,10 +147,10 @@ object VerificationComponent extends SimpleComponent {
       val res = inox.Bench.time("apply/check", check(funs, p))
 
       inox.Bench.time("verification report",
-      new VerificationReport {
-        val program: p.type = p
-        val results = res
-      }
+        new VerificationReport {
+          val program: p.type = p
+          val results = res
+        }
       )
     })
     v

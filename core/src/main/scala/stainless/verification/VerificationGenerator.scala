@@ -6,7 +6,17 @@ package verification
 trait VerificationGenerator { self =>
   val program: Program
 
-  def generateVCs(funs: Seq[Identifier]): Seq[VC[self.program.trees.type]] = {
+  import program._
+  import program.symbols._
+  import program.trees._
+  import CallGraphOrderings._
+
+  type VC = verification.VC[program.trees.type]
+
+  protected def getTactic(fd: FunDef): Tactic { val program: self.program.type }
+
+
+  def generateVCs(funs: Seq[Identifier]): Seq[VC] = {
     val vcs: Seq[VC] = (for (id <- funs) yield {
       val fd = getFunction(id)
       val tactic = getTactic(fd)
@@ -29,12 +39,21 @@ trait VerificationGenerator { self =>
 
 object VerificationGenerator {
 
-    def gen(p: StainlessProgram, opts: inox.Options)(funs: Seq[Identifier]): Seq[VC[p.trees.type]] = {
-        generateVCs(funs)
-    }
+  def gen(p: StainlessProgram)(funs: Seq[Identifier]): Seq[VC[p.trees.type]] = {
+    object generator extends VerificationGenerator {
+      val program: p.type = p
 
-    def gen(p: StainlessProgram)(funs: Seq[Identifier]): Seq[VC[p.trees.type]] = {
-        gen(p, p.ctx.options)(funs)
+      val defaultTactic = DefaultTactic(p)
+      val inductionTactic = InductionTactic(p)
+
+      protected def getTactic(fd: p.trees.FunDef) =
+        if (fd.flags contains "induct") {
+          inductionTactic
+        } else {
+          defaultTactic
+        }
     }
+    generator.generateVCs(funs)
+  }
 
 }

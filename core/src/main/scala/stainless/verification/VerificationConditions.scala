@@ -6,8 +6,7 @@ package verification
 import inox.solvers.Solver
 
 /** This is just to hold some history information. */
-@SerialVersionUID(1L)
-case class VC[T <: ast.Trees](condition: T#Expr, fd: Identifier, kind: VCKind) extends inox.utils.Positioned with Serializable
+case class VC[T <: ast.Trees](condition: T#Expr, fd: Identifier, kind: VCKind) extends inox.utils.Positioned
 
 sealed abstract class VCKind(val name: String, val abbrv: String) {
   override def toString = name

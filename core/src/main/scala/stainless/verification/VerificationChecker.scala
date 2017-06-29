@@ -7,6 +7,7 @@ import inox.solvers._
 
 object optParallelVCs extends inox.FlagOptionDef("parallelvcs", false)
 object optFailEarly extends inox.FlagOptionDef("failearly", false)
+object optVCCache extends inox.FlagOptionDef("vccache", false)
 
 object DebugSectionVerification extends inox.DebugSection("verification")
 
@@ -20,7 +21,6 @@ trait VerificationChecker { self =>
   import program._
   import program.trees._
   import program.symbols._
-  import CallGraphOrderings._
 
   implicit val debugSection = DebugSectionVerification
 
@@ -32,13 +32,12 @@ trait VerificationChecker { self =>
   type VCResult = verification.VCResult[program.Model]
   val VCResult = verification.VCResult
 
-  protected def getTactic(fd: FunDef): Tactic { val program: self.program.type }
   protected def getFactory: SolverFactory {
     val program: self.program.type
     type S <: inox.solvers.combinators.TimeoutSolver { val program: self.program.type }
   }
 
-  private def defaultStop(res: VCResult): Boolean = if (failEarly) res.status != VCStatus.Valid else false
+  protected def defaultStop(res: VCResult): Boolean = if (failEarly) res.status != VCStatus.Valid else false
 
   def verify(vcs: Seq[VC], stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
     val sf = ctx.options.findOption(inox.optTimeout) match {
@@ -60,80 +59,34 @@ trait VerificationChecker { self =>
     var stop = false
 
     val initMap: Map[VC, VCResult] = vcs.map(vc => vc -> unknownResult).toMap
-    // val verifiedVCs = inox.Bench.time("getVerifiedVCS", VerificationCache.getVerifiedVCs())
-
-    def checkVCWithCache(vc: VC, sf: SolverFactory { val program: self.program.type }) = inox.Bench.time("check vc with cache", {
-      // if (vccache && verifiedVCs.contains(vc,program)) {
-      //   ctx.reporter.synchronized {
-      //     ctx.reporter.debug("The following VC has already been verified:")
-      //     ctx.reporter.debug(vc)
-      //     ctx.reporter.debug("--------------")
-      //   }
-      //   VCResult(VCStatus.Valid, None, Some(0))
-      // } 
-      // else
-        inox.Bench.time("checking VC", checkVC(vc,sf))
-    })
 
     // scala doesn't seem to have a nice common super-type of vcs and vcs.par, so these
     // two quasi-identical pieces of code have to remain separate...
     val results = if (parallelCheck) {
       for (vc <- vcs.par if !stop && !ctx.interruptManager.isInterrupted) yield {
-        val res = checkVCWithCache(vc, sf)
+        val res = checkVC(vc, sf)
         if (ctx.interruptManager.isInterrupted) ctx.interruptManager.reset()
         stop = stopWhen(res)
         vc -> res
       }
     } else {
       for (vc <- vcs if !stop && !ctx.interruptManager.isInterrupted) yield {
-        val res = checkVCWithCache(vc, sf)
+        val res = checkVC(vc, sf)
         if (ctx.interruptManager.isInterrupted) ctx.interruptManager.reset()
         stop = stopWhen(res)
         vc -> res
       }
-    } 
-
-    // if (vccache) {
-    //   inox.Bench.time("writing vc", {
-    //     val newVerifiedVCs: Set[String] = Set[String]() ++
-    //       inox.Bench.time("serializing VCs", results.
-    //         filter { case (vc, res) => res.isValid }.
-    //         map { case (vc, res) => vc.condition.serialize })
-
-    //     val funs = inox.Bench.time("serializing functions", program.symbols.functions.map { case (k,v) => (k.serialize,v.serialize) })
-    //     val adts = inox.Bench.time("serializing adts", program.symbols.adts.map { case (k,v) => (k.serialize,v.serialize) })
-    //     val v = VerifiedVCs(funs, adts, newVerifiedVCs)
-
-    //     writeVerifiedVCs(v)
-    //   })
-    // }
+    }
 
     initMap ++ results
   }
 
-  private def removeUnusedLets(e: Expr): Expr = {
-    exprOps.postMap({
-      case Let(vd,_,body) =>
-        if (exprOps.variablesOf(body).contains(vd.toVariable)) None
-        else Some(body)
-      case _ => None
-    }, applyRec=true)(e)
-  }
-
-  private def removeAsserts(e: Expr): Expr = {
-    exprOps.preMap({
-      case Assert(_, _, body) => Some(body)
-      case _ => None
-    }, applyRec=true)(e)
-  }
-
-  private def checkVC(vc: VC, sf: SolverFactory { val program: self.program.type }): VCResult = {
+  protected def checkVC(vc: VC, sf: SolverFactory { val program: self.program.type }): VCResult = {
     import SolverResponses._
     val s = sf.getNewSolver
 
     try {
-      val cond_aux = inox.Bench.time("simplifyLets", simplifyLets(vc.condition))
-      val cond = inox.Bench.time("removals", removeUnusedLets(removeAsserts(cond_aux)))
+      val cond = inox.Bench.time("simplifyLets", simplifyLets(vc.condition))
       ctx.reporter.synchronized {
         ctx.reporter.info(s" - Now considering '${vc.kind}' VC for ${vc.fd} @${vc.getPos}...")
         ctx.reporter.debug(cond.asString)
@@ -206,24 +159,22 @@ object VerificationChecker {
   def verify(p: StainlessProgram, opts: inox.Options)
             (vcs: Seq[VC[p.trees.type]]): Map[VC[p.trees.type], VCResult[p.Model]] = {
 
-    object checker extends VerificationChecker {
+    val vccache = opts.findOptionOrDefault(optVCCache)
+
+    trait checkerInterface extends VerificationChecker {
 
       val program: p.type = p
       val options = opts
 
-      val defaultTactic = DefaultTactic(p)
-      val inductionTactic = InductionTactic(p)
-
-      protected def getTactic(fd: p.trees.FunDef) =
-        if (fd.flags contains "induct") {
-          inductionTactic
-        } else {
-          defaultTactic
-        }
       protected def getFactory = solvers.SolverFactory.apply(p, opts)
     }
+    object checker extends checkerInterface
+    object cacheChecker extends checkerInterface with VerificationCache
 
-    checker.verify(vcs)
+    if (true)
+      cacheChecker.verify(vcs)
+    else
+      checker.verify(vcs)
   }
 
   def verify(p: StainlessProgram)(vcs: Seq[VC[p.trees.type]]): Map[VC[p.trees.type], VCResult[p.Model]] = {
