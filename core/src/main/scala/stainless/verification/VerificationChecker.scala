@@ -5,28 +5,17 @@ package verification
 
 import inox.solvers._
 
-import java.io.ObjectInputStream
-import java.io.FileInputStream
-import java.io.ObjectOutputStream
-import java.io.FileOutputStream
-
 object optParallelVCs extends inox.FlagOptionDef("parallelvcs", false)
 object optFailEarly extends inox.FlagOptionDef("failearly", false)
-object optVCCache extends inox.FlagOptionDef("vccache", false)
 
 object DebugSectionVerification extends inox.DebugSection("verification")
 
 trait VerificationChecker { self =>
   val program: Program
-  //val transAfterTactic = IdentityTransformer
-//  final val program2: Program = transAfterTactic.transform(program)
-  val program2: Program { val trees: self.program.trees.type }
   val options: inox.Options
 
   private lazy val parallelCheck = options.findOptionOrDefault(optParallelVCs)
   private lazy val failEarly = options.findOptionOrDefault(optFailEarly)
-  private lazy val vccache = options.findOptionOrDefault(optVCCache)
-  private lazy val cacheFile = "vccache.bin"
 
   import program._
   import program.trees._
@@ -38,29 +27,26 @@ trait VerificationChecker { self =>
   type VC = verification.VC[program.trees.type]
   val VC = verification.VC
 
-  type VCStatus = verification.VCStatus[program2.Model]
+  type VCStatus = verification.VCStatus[program.Model]
 
-  type VCResult = verification.VCResult[program2.Model]
+  type VCResult = verification.VCResult[program.Model]
   val VCResult = verification.VCResult
 
   protected def getTactic(fd: FunDef): Tactic { val program: self.program.type }
   protected def getFactory: SolverFactory {
-    val program: self.program2.type
-    type S <: inox.solvers.combinators.TimeoutSolver { val program: self.program2.type }
+    val program: self.program.type
+    type S <: inox.solvers.combinators.TimeoutSolver { val program: self.program.type }
   }
 
   private def defaultStop(res: VCResult): Boolean = if (failEarly) res.status != VCStatus.Valid else false
 
-  def verify(funs: Seq[Identifier], stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
+  def verify(vcs: Seq[VC], stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
     val sf = ctx.options.findOption(inox.optTimeout) match {
       case Some(to) => getFactory.withTimeout(to)
       case None => getFactory
     }
 
     try {
-      ctx.reporter.debug("Generating Verification Conditions...")
-      val vcs = inox.Bench.time("generating vcs", generateVCs(funs))
-
       ctx.reporter.debug("Checking Verification Conditions...")
       inox.Bench.time("checking vcs", checkVCs(vcs, sf, stopWhen))
     } finally {
@@ -68,149 +54,24 @@ trait VerificationChecker { self =>
     }
   }
 
-  def generateVCs(funs: Seq[Identifier]): Seq[VC] = {
-    val vcs: Seq[VC] = (for (id <- funs) yield {
-      val fd = getFunction(id)
-      val tactic = getTactic(fd)
-
-      if (fd.body.isDefined) {
-        inox.Bench.time("generating", tactic.generateVCs(id))
-      } else {
-        Nil
-      }
-    }).flatten
-
-    vcs.sortBy(vc => (getFunction(vc.fd),
-      if (vc.kind.underlying == VCKind.Precondition) 0
-      else if (vc.kind.underlying == VCKind.Assert) 1
-      else 2
-    ))
-  }
-
-
-  implicit class SerializeFunDef(fd: FunDef) {
-    val uniq = new PrinterOptions(printUniqueIds = true)
-    def serialize(): String = fd.asString(uniq)
-  }
-
-  implicit class SerializeExpr(e: Expr) {
-    val uniq = new PrinterOptions(printUniqueIds = true)
-    def serialize(): String = e.asString(uniq)
-  }
-
-  implicit class SerializeADTDef(a: ADTDefinition) {
-    val uniq = new PrinterOptions(printUniqueIds = true)
-    def serialize(): (String,String) = ((a.asString(uniq), a.invariant.map(_.asString(uniq)).mkString))
-  }
-
-  implicit class SerializeIdentifier(id: Identifier) {
-    val uniq = new PrinterOptions(printUniqueIds = true)
-    def serialize(): String = id.asString(uniq)
-  }
-
-
-
-  // Self-Contained VCs: stores a set of verified VCs
-  // We store every function definition. For adts, we store the ADT definition as well
-  // the invariant.
-  case class VerifiedVCs(funs: Map[String,String], programADTs: Map[String,(String,String)], vcs: Set[String]) extends Serializable {
-    def contains(vc: VC, program: self.program.type): Boolean = {
-      val vcString = vc.condition.serialize
-      vcs.contains(vcString) && {
-
-        var adts = Set[(Identifier,ADTDefinition)]()
-        
-        inox.Bench.time("gathering adts", {
-          new TreeTraverser {
-            override def traverse(tpe: Type): Unit = {
-              tpe match {
-                case adt: ADTType => 
-                  val id = adt.id
-                  val a = getADT(adt.id)
-                  adts += ((id,a))
-                case _ => ()
-              }
-              super.traverse(tpe)
-            }
-          }.traverse(vc.condition)
-        })
-
-        val adtInvariants: Set[FunDef] = adts.flatMap(_._2.invariant)
-        val invariantsBodies = adtInvariants.map(_.fullBody)
-
-        val callees = inox.Bench.time("getting transitive callees", {
-          (invariantsBodies + vc.condition).flatMap(e =>
-            exprOps.functionCallsOf(e).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
-          )
-        })
-
-        ctx.reporter.synchronized {
-          ctx.reporter.debug("Checking containment of VC")
-          ctx.reporter.debug(vc)
-          ctx.reporter.debug("Program functions for the VC")
-          for (fd <- callees) {
-            ctx.reporter.debug(fd)
-            ctx.reporter.debug("\n\n")
-          }
-          ctx.reporter.debug("ADT definitions for the VC")
-          for (a <- adts) {
-            ctx.reporter.debug(a)
-            ctx.reporter.debug("\n\n")
-          }
-        }
-
-
-        adts.forall { 
-          case (id,a) =>
-            val serializedID = id.serialize
-            programADTs.contains(serializedID) && programADTs(serializedID) == a.serialize
-        } &&
-        callees.forall { fd =>
-          val serializedID = fd.id.serialize
-          funs.contains(serializedID) && funs(serializedID) == fd.serialize
-        }
-        
-      }
-    }
-  }
-
-
-  def getVerifiedVCs(): VerifiedVCs = {
-    if (vccache && new java.io.File(cacheFile).exists) {
-      val ois = new ObjectInputStream(new FileInputStream(cacheFile))
-      val (funs,adts,vcs) = ois.readObject.asInstanceOf[(Map[String,String], Map[String,(String,String)], Set[String])]
-      ois.close()
-      VerifiedVCs(funs,adts,vcs)
-    }
-    else {
-      VerifiedVCs(Map(),Map(),Set())
-    }
-  }
-
-  def writeVerifiedVCs(v: VerifiedVCs) = {
-    val oos = new ObjectOutputStream(new FileOutputStream(cacheFile))
-    oos.writeObject((v.funs, v.programADTs, v.vcs))
-    oos.close()
-  }
-
   private lazy val unknownResult: VCResult = VCResult(VCStatus.Unknown, None, None)
 
-  def checkVCs(vcs: Seq[VC], sf: SolverFactory { val program: self.program2.type }, stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
+  def checkVCs(vcs: Seq[VC], sf: SolverFactory { val program: self.program.type }, stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
     var stop = false
 
     val initMap: Map[VC, VCResult] = vcs.map(vc => vc -> unknownResult).toMap
-    val verifiedVCs = inox.Bench.time("getVerifiedVCS", getVerifiedVCs())
+    // val verifiedVCs = inox.Bench.time("getVerifiedVCS", VerificationCache.getVerifiedVCs())
 
-    def checkVCWithCache(vc: VC, sf: SolverFactory { val program: self.program2.type }) = inox.Bench.time("check vc with cache", {
-      if (vccache && verifiedVCs.contains(vc,program)) {
-        ctx.reporter.synchronized {
-          ctx.reporter.debug("The following VC has already been verified:")
-          ctx.reporter.debug(vc)
-          ctx.reporter.debug("--------------")
-        }
-        VCResult(VCStatus.Valid, None, Some(0))
-      } 
-      else
+    def checkVCWithCache(vc: VC, sf: SolverFactory { val program: self.program.type }) = inox.Bench.time("check vc with cache", {
+      // if (vccache && verifiedVCs.contains(vc,program)) {
+      //   ctx.reporter.synchronized {
+      //     ctx.reporter.debug("The following VC has already been verified:")
+      //     ctx.reporter.debug(vc)
+      //     ctx.reporter.debug("--------------")
+      //   }
+      //   VCResult(VCStatus.Valid, None, Some(0))
+      // } 
+      // else
         inox.Bench.time("checking VC", checkVC(vc,sf))
     })
 
@@ -230,22 +91,22 @@ trait VerificationChecker { self =>
         stop = stopWhen(res)
         vc -> res
       }
-    }
+    } 
 
-    if (vccache) {
-      inox.Bench.time("writing vc", {
-        val newVerifiedVCs: Set[String] = Set[String]() ++
-          inox.Bench.time("serializing VCs", results.
-            filter { case (vc, res) => res.isValid }.
-            map { case (vc, res) => vc.condition.serialize })
+    // if (vccache) {
+    //   inox.Bench.time("writing vc", {
+    //     val newVerifiedVCs: Set[String] = Set[String]() ++
+    //       inox.Bench.time("serializing VCs", results.
+    //         filter { case (vc, res) => res.isValid }.
+    //         map { case (vc, res) => vc.condition.serialize })
 
-        val funs = inox.Bench.time("serializing functions", program.symbols.functions.map { case (k,v) => (k.serialize,v.serialize) })
-        val adts = inox.Bench.time("serializing adts", program.symbols.adts.map { case (k,v) => (k.serialize,v.serialize) })
-        val v = VerifiedVCs(funs, adts, newVerifiedVCs)
+    //     val funs = inox.Bench.time("serializing functions", program.symbols.functions.map { case (k,v) => (k.serialize,v.serialize) })
+    //     val adts = inox.Bench.time("serializing adts", program.symbols.adts.map { case (k,v) => (k.serialize,v.serialize) })
+    //     val v = VerifiedVCs(funs, adts, newVerifiedVCs)
 
-        writeVerifiedVCs(v)
-      })
-    }
+    //     writeVerifiedVCs(v)
+    //   })
+    // }
 
     initMap ++ results
   }
@@ -266,7 +127,7 @@ trait VerificationChecker { self =>
     }, applyRec=true)(e)
   }
 
-  private def checkVC(vc: VC, sf: SolverFactory { val program: self.program2.type }): VCResult = {
+  private def checkVC(vc: VC, sf: SolverFactory { val program: self.program.type }): VCResult = {
     import SolverResponses._
     val s = sf.getNewSolver
 
@@ -343,18 +204,12 @@ trait VerificationChecker { self =>
 object VerificationChecker {
 
   def verify(p: StainlessProgram, opts: inox.Options)
-            (funs: Seq[Identifier]): Map[VC[p.trees.type], VCResult[p.Model]] = {
+            (vcs: Seq[VC[p.trees.type]]): Map[VC[p.trees.type], VCResult[p.Model]] = {
 
     object checker extends VerificationChecker {
 
       val program: p.type = p
       val options = opts
-
-      object ps extends transformers.ProgramSimplifier {
-        val trees: p.trees.type = p.trees
-      }
-      val simpleP: StainlessProgram = p.transform(ps)
-      val program2: simpleP.type = simpleP
 
       val defaultTactic = DefaultTactic(p)
       val inductionTactic = InductionTactic(p)
@@ -365,13 +220,13 @@ object VerificationChecker {
         } else {
           defaultTactic
         }
-      protected def getFactory = solvers.SolverFactory.apply(program2, opts)
+      protected def getFactory = solvers.SolverFactory.apply(p, opts)
     }
 
-    checker.verify(funs)
+    checker.verify(vcs)
   }
 
-  def verify(p: StainlessProgram)(funs: Seq[Identifier]): Map[VC[p.trees.type], VCResult[p.Model]] = {
-    verify(p, p.ctx.options)(funs)
+  def verify(p: StainlessProgram)(vcs: Seq[VC[p.trees.type]]): Map[VC[p.trees.type], VCResult[p.Model]] = {
+    verify(p, p.ctx.options)(vcs)
   }
 }
