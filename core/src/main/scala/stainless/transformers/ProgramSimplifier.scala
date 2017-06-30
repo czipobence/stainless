@@ -17,12 +17,12 @@ trait ProgramSimplifier { self =>
 
   type VC = verification.VC[trees.type]
 
-  private def transformVC(f: Expr => Expr)(vc: VC): VC = {
-    verification.VC(f(vc.condition), vc.fd, vc.kind)
-  }
-  private def transformFD(f: Expr => Expr)(fd: FunDef): FunDef = {
+  private def transformVC(f: Expr => Expr)(vc: VC): VC =
+    verification.VC(f(vc.condition), vc.fd, vc.kind).setPos(vc.getPos)
+  
+  private def transformFD(f: Expr => Expr)(fd: FunDef): FunDef =
     fd.copy(fullBody = f(fd.fullBody))
-  }
+  
 
   private def removeUnusedLets(e: Expr): Expr = {
     exprOps.postMap({
@@ -38,7 +38,7 @@ trait ProgramSimplifier { self =>
 
   private def removeAsserts(e: Expr): Expr = inox.Bench.time("removing asserts", {
     exprOps.preMap({
-      case Assert(_, _, body) => Some(body)
+      case a@Assert(_, _, body) => Some(body.copiedFrom(a))
       case _ => None
     }, applyRec=true)(e)
   })
@@ -91,13 +91,8 @@ trait ProgramSimplifier { self =>
     }(e)
   }
 
-  private def removeParameter(vc: VC, id: Identifier, parameterToRemove: Int): VC = {
-    verification.VC(removeParameter(vc.condition, id, parameterToRemove), vc.fd, vc.kind)
-  }
-
-  private def removeParameters(vc: VC, parametersToRemove: Map[Identifier, List[Int]]): VC = {
-    verification.VC(removeParameters(vc.condition, parametersToRemove), vc.fd, vc.kind)
-  }
+  private def removeParameters(vc: VC, parametersToRemove: Map[Identifier, List[Int]]): VC =
+    transformVC(removeParameters(_, parametersToRemove))(vc)
 
   private def removeParameter(fd: FunDef, id: Identifier, parameterToRemove: Int): FunDef = {
     fd.copy(fullBody = removeParameter(fd.fullBody, id, parameterToRemove))
@@ -105,21 +100,13 @@ trait ProgramSimplifier { self =>
 
   def transform(syms: Symbols, vcs: Seq[VC]): (Symbols, Seq[VC]) = {
 
-    println("simplifying program")
-//    println(syms)
-
     val noassertFuns = removeAssertsAndRequires(syms.functions)
-    val noassertVCs = vcs.map(transformVC(removeAsserts))
-
-    println("======================")
-    println("removed asserts")
-//    println(noassertSymbs)
+    val noassertVCs: Seq[VC] = vcs.map { vc => transformVC(removeAsserts)(vc) }
 
     def loop( funs: Map[Identifier, FunDef], 
               toVisit: Set[Identifier], 
               modifiers: Map[Identifier, List[Int]])
               : (Map[Identifier, FunDef], Map[Identifier, List[Int]]) = {
-      println("to visit: " + toVisit.size)
       if (toVisit.isEmpty) (funs, modifiers)
       else {
 
@@ -135,19 +122,10 @@ trait ProgramSimplifier { self =>
           fd.params.zipWithIndex.find { case (vd,_) => !freeVariables.contains(vd.id) } match {
             case Some((vd,i)) =>
               val calls = inox.Bench.time("getting callers", callers(fd).map(_.id))
-              // println(fd.flags)
-              println("Removing %s at index %s from %s".format(vd,i,id.name))
-              // println("The callers are")
-              // println(calls.map(id => id.name))
-              // println(fd)
-
-
-              // inox.Bench.reportS()
+              
               val funs2 = calls.foldLeft(funs) { case (funDefs, id2) =>
                 val fd2 = funs(id2)
-                // println("removing parameter (%s,%s) from: %s".format(id.name,i,fd2.id.name))
                 val newFD2 = removeUnusedLets(removeParameter(fd2, id, i))
-                // println(newFD2)
                 funDefs.updated(fd2.id, newFD2)
               }
               val funs3 = funs2.updated(id, funs2(id).copy(
@@ -155,35 +133,8 @@ trait ProgramSimplifier { self =>
               ))
               val newModifiers = modifiers.updated(id, modifiers.getOrElse(id, Nil) :+ i)
               
-              // println("new type!")
               val newFD = funs3(id)
               val tempSymbols = NoSymbols.withFunctions(funs3.values.toSeq).withADTs(syms.adts.values.toSeq)
-              // println("===================")
-              // println("===================")
-              // println("===================")
-              // println("===================")
-              // println(tempSymbols)
-              // println("===================")
-              // println("===================")
-              // println("===================")
-              // println("===================")
-              for (fdTemp <- funs3.values) {
-                try {
-                  tempSymbols.typeCheck(fdTemp.fullBody, fdTemp.returnType)
-                } catch {
-                  case e: Throwable =>
-                    println("EXPLAINING: " + fdTemp.id.name)
-                    println(tempSymbols.explainTyping(fdTemp.fullBody))
-                    throw new Exception("YABLOL")
-                }
-                
-                // try {
-                //   tempSymbols.typeCheck(fdTemp.fullBody, fdTemp.returnType)
-                // } catch {
-                //   case e: Throwable => 
-                //     tempSymbols.explainTyping(fdTemp.fullBody)
-                // }
-              }
 
               loop(funs3, toVisit.tail ++ calls, newModifiers)
             case None =>
@@ -194,17 +145,7 @@ trait ProgramSimplifier { self =>
     }
 
     val (funs, modifiers) = loop(noassertFuns, syms.functions.values.map(_.id).toSet, Map())
-    // val (funs, modifiers) = (noassertFuns, Map[Identifier,List[Int]]())
     val newSyms = NoSymbols.withFunctions(funs.values.toSeq).withADTs(syms.adts.values.toSeq)
-    
-    // for (vc <- noassertVCs) {
-    //   val newVC = removeUnusedLets(removeParameters(vc, modifiers))
-
-    //   println("typechecking")
-    //   println(newVC.condition)
-
-    //   // println(newSyms.typeCheck(newVC.condition))
-    // }
     
     (newSyms, noassertVCs.map(vc => removeUnusedLets(removeParameters(vc, modifiers))))
   }

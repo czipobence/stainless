@@ -12,6 +12,8 @@ import org.json4s.JsonAST.{ JArray, JObject, JValue }
 
 import scala.language.existentials
 
+object optSimplify extends inox.FlagOptionDef("simplify", false)
+
 object VerificationComponent extends SimpleComponent {
   val name = "verification"
   val description = "Verification of function contracts"
@@ -130,7 +132,13 @@ object VerificationComponent extends SimpleComponent {
 
       inox.Bench.time("verificationChecker", {
         val vcs1 = VerificationGenerator.gen(encoder.targetProgram)(funs)
-        val (simpleProgram, vcs2) = transformers.ProgramSimplifier.simplify(encoder.targetProgram)(vcs1)
+
+        val simplify = p.ctx.options.findOptionOrDefault(optSimplify)
+        val (simpleProgram, vcs2) =
+          if (true)
+            transformers.ProgramSimplifier.simplify(encoder.targetProgram)(vcs1)
+          else
+            (encoder.targetProgram, vcs1)
 
         VerificationChecker.verify(simpleProgram)(vcs2).mapValues {
           case VCResult(VCStatus.Invalid(model), s, t) =>

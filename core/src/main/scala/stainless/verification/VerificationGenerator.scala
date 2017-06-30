@@ -53,7 +53,7 @@ object VerificationGenerator {
           defaultTactic
         }
     }
-    generator.generateVCs(funs)
+    inox.Bench.time("generator generating", generator.generateVCs(funs))
   }
 
 }

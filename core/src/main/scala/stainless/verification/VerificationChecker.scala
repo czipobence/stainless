@@ -162,7 +162,6 @@ object VerificationChecker {
     val vccache = opts.findOptionOrDefault(optVCCache)
 
     trait checkerInterface extends VerificationChecker {
-
       val program: p.type = p
       val options = opts
 
@@ -171,7 +170,7 @@ object VerificationChecker {
     object checker extends checkerInterface
     object cacheChecker extends checkerInterface with VerificationCache
 
-    if (true)
+    if (vccache)
       cacheChecker.verify(vcs)
     else
       checker.verify(vcs)

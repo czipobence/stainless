@@ -39,7 +39,8 @@ trait MainHelpers extends inox.MainHelpers {
     codegen.optSmallArrays -> Description(Evaluators, "Assume all arrays fit into memory during code generation"),
     verification.optParallelVCs -> Description(Verification, "Check verification conditions in parallel"),
     verification.optFailEarly -> Description(Verification, "Halt verification as soon as a check fails"),
-    verification.optVCCache -> Description(Verification, "Enables caching of verification conditions"),
+    verification.optVCCache -> Description(Verification, "Enable caching of verification conditions"),
+    verification.optSimplify -> Description(Verification, "Simplify the program and the VCs before giving them to the solver"),
     verification.VerificationComponent.optStrictArithmetic -> Description(Verification, "Check arithmetic operations for unintended behaviour and overflows"),
     inox.optTimeout -> Description(General, "Set a timeout n (in sec) such that\n" +
       "  - verification: each proof attempt takes at most n seconds\n" +
@@ -105,7 +106,7 @@ trait MainHelpers extends inox.MainHelpers {
       inoxCtx.timers.outputTable(debug)
     }
 
-//    Bench.reportS()
+   Bench.reportS()
     
     def exportJson(file: String): Unit = {
       inoxCtx.reporter.info(s"Outputing JSON summary to $file")

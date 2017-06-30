@@ -11,18 +11,13 @@ import java.io.FileOutputStream
 
 import inox.solvers.SolverFactory
 
-object DebugSectionCache extends inox.DebugSection("cache")
-
 trait VerificationCache extends VerificationChecker { self =>
 
   import program._
   import program.symbols._
   import program.trees._
 
-  implicit val debugSectionCache = DebugSectionCache
-
   private lazy val cacheFile = "vccache.bin"
-
 
   implicit class SerializeFunDef(fd: FunDef) {
     val uniq = new PrinterOptions(printUniqueIds = true)
@@ -43,9 +38,6 @@ trait VerificationCache extends VerificationChecker { self =>
     val uniq = new PrinterOptions(printUniqueIds = true)
     def serialize(): String = id.asString(uniq)
   }
-
-
-
 
   // Self-Contained VCs: stores a set of verified VCs
   // We store every function definition. For adts, we store the ADT definition as well
