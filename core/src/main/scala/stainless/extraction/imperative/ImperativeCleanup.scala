@@ -67,6 +67,15 @@ trait ImperativeCleanup extends inox.ast.SymbolTransformer { self =>
     val simpleSyms = t.NoSymbols
       .withADTs(pureUnitSyms.adts.values.toSeq)
       .withFunctions(pureUnitSyms.functions.values.toSeq.map { fd =>
+        // println("simplyfing lets")
+        // println(fd.fullBody)
+        // println("result")
+        // println(pureUnitSyms.simplifyLets(fd.fullBody))
+        // println("==============")
+        // println("==============")
+        // println("==============")
+        // println("==============")
+        // println("==============")
         fd.copy(fullBody = pureUnitSyms.simplifyLets(fd.fullBody))
       })
 

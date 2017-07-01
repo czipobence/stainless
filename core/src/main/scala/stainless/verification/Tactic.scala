@@ -8,7 +8,10 @@ trait Tactic {
   val description: String
 
   protected type VC = verification.VC[program.trees.type]
-  protected def VC(cond: program.trees.Expr, id: Identifier, kind: VCKind): VC = verification.VC(cond, id, kind)
+  protected def VC(cond: program.trees.Expr, id: Identifier, kind: VCKind, nonRemovable: Set[String] = Set()): VC = {
+    // println("create VC with nonRemovable: " + nonRemovable)
+    verification.VC(cond, id, kind, nonRemovable)
+  }
 
   def generateVCs(id: Identifier): Seq[VC] = {
     inox.Bench.time("postconditions", generatePostconditions(id)) ++

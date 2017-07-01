@@ -223,7 +223,10 @@ trait SymbolOps extends inox.ast.SymbolOps { self: TypeOps =>
     case FunctionType(args, res) if args.size > 1 =>
       val newArgs = fun match {
         case Lambda(args, _) => args
-        case _ => args map (tpe => ValDef(FreshIdentifier("x", true), tpe))
+        case _ => 
+          println("TUPLE WRAP ARG")
+          println(fun)
+          args map (tpe => ValDef(FreshIdentifier("x", true), tpe))
       }
 
       val res = ValDef(FreshIdentifier("res", true), TupleType(args))

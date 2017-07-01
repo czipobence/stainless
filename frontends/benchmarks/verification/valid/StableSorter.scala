@@ -110,6 +110,6 @@ object StableSorter {
   def hint[T](t: T, lemma: Boolean): T = {
     require(lemma)
     t
-  }
+  } ensuring(_ => lemma)
 
 }

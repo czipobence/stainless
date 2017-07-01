@@ -37,7 +37,15 @@ trait DefaultTactic extends Tactic {
     transformers.CollectorWithPC(program) {
       case (e @ Ensuring(body, lambda), path) =>
         val vc = path implies application(lambda, Seq(body))
-        VC(vc, id, VCKind.Postcondition).setPos(e)
+        // println("CREATING VC")
+        // println(vc)
+        // println(lambda.args.map(_.id).toSet)
+        val res = VC(vc, id, VCKind.Postcondition, lambda.args.map(_.id.name).toSet)
+        // println(res)
+        // println("=========")
+        // println("=========")
+        // println("=========")
+        res.setPos(e)
     }.collect(body)
   }
 

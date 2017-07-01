@@ -4,9 +4,13 @@ package stainless
 package verification
 
 import inox.solvers.Solver
-
+ 
 /** This is just to hold some history information. */
-case class VC[T <: ast.Trees](condition: T#Expr, fd: Identifier, kind: VCKind) extends inox.utils.Positioned
+// nonRemovable: stores variable identifiers that are not to be simplified by the ProgramSimplifier
+case class VC[T <: ast.Trees](condition: T#Expr, fd: Identifier, kind: VCKind, nonRemovable: Set[String] = Set()) extends inox.utils.Positioned {
+  // def addNonRemovable(id: String) = VC(condition, fd, kind, nonRemovable + id)
+  // def addNonRemovables(ids: Iterable[String]) = VC(condition, fd, kind, nonRemovable ++ ids)
+}
 
 sealed abstract class VCKind(val name: String, val abbrv: String) {
   override def toString = name

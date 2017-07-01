@@ -7,6 +7,7 @@ import inox.solvers._
 
 object optParallelVCs extends inox.FlagOptionDef("parallelvcs", false)
 object optFailEarly extends inox.FlagOptionDef("failearly", false)
+object optFailInvalid extends inox.FlagOptionDef("failinvalid", false)
 object optVCCache extends inox.FlagOptionDef("vccache", false)
 
 object DebugSectionVerification extends inox.DebugSection("verification")
@@ -17,6 +18,7 @@ trait VerificationChecker { self =>
 
   private lazy val parallelCheck = options.findOptionOrDefault(optParallelVCs)
   private lazy val failEarly = options.findOptionOrDefault(optFailEarly)
+  private lazy val failInvalid = options.findOptionOrDefault(optFailInvalid)
 
   import program._
   import program.trees._
@@ -37,7 +39,10 @@ trait VerificationChecker { self =>
     type S <: inox.solvers.combinators.TimeoutSolver { val program: self.program.type }
   }
 
-  protected def defaultStop(res: VCResult): Boolean = if (failEarly) res.status != VCStatus.Valid else false
+  protected def defaultStop(res: VCResult): Boolean = 
+    if (failEarly) res.status != VCStatus.Valid 
+    else if (failInvalid) res.status == VCStatus.Invalid
+    else false
 
   def verify(vcs: Seq[VC], stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
     val sf = ctx.options.findOption(inox.optTimeout) match {
