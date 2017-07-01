@@ -11,6 +11,6 @@ object ArrayParamMutation2 {
       a(1) = a(1) + a(0)
       rec(a)
     }
-  } ensuring(res => a(0) == 0)
+  } ensuring(res => a.length > 1 && a(0) == 0)
 
 }
