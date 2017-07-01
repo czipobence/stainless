@@ -1496,6 +1496,9 @@ trait CodeGeneration { self: CompilationUnit =>
       mkExpr(other, ch, canDelegateToMkBranch = false)
       ch << IfEq(elze) << Goto(thenn)
 
+    case Dontcheck(condition) =>
+      mkBranch(condition, thenn, elze, ch)
+
     case other => throw CompilationException("Unsupported branching expr. : " + other)
   }
 
