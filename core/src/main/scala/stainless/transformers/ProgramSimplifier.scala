@@ -26,6 +26,7 @@ trait ProgramSimplifier { self =>
 
   private def removeUnusedLets(e: Expr, except: Set[String] = Set()): Expr = {
     exprOps.postMap({
+      case Let(_, IsTyped(e, UnitType), _) =>  None
       case Let(vd,_,body) =>
         if (exprOps.variablesOf(body).contains(vd.toVariable) ||
             inox.isPersistent(vd.id.name) ||
