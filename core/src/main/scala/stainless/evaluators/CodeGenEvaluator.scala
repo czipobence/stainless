@@ -154,6 +154,9 @@ trait CodeGenEvaluator
 
         case e: java.lang.OutOfMemoryError =>
           EvaluationResults.RuntimeError("Out of memory")
+
+        case e: java.lang.IndexOutOfBoundsException =>
+          EvaluationResults.RuntimeError("Out of bounds exception")
       }
     })
   }
