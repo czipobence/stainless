@@ -1223,6 +1223,9 @@ trait CodeGeneration { self: CompilationUnit =>
       mkBranch(b, al, fl, ch, canDelegateToMkExpr = false)
       ch << Label(fl) << POP << Ldc(0) << Label(al)
 
+    case Dontcheck(body) =>
+      mkExpr(body, ch)
+
     case _ => throw CompilationException("Unsupported expr " + e + " : " + e.getClass)
   }
 
