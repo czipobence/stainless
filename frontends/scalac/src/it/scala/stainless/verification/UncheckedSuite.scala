@@ -8,7 +8,7 @@ import org.scalatest._
 trait UncheckedSuite extends ComponentTestSuite {
 
   override def configurations = super.configurations.map {
-    seq => Seq(optFailEarly(true), inox.solvers.optCheckModels(false)) ++ seq
+    seq => Seq(optFailInvalid(true), inox.solvers.optCheckModels(false)) ++ seq
   }
 
   val component = VerificationComponent

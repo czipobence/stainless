@@ -39,10 +39,11 @@ trait VerificationChecker { self =>
     type S <: inox.solvers.combinators.TimeoutSolver { val program: self.program.type }
   }
 
-  protected def defaultStop(res: VCResult): Boolean = 
-    if (failEarly) res.status != VCStatus.Valid 
-    else if (failInvalid) res.status == VCStatus.Invalid
+  protected def defaultStop(res: VCResult): Boolean = {
+    if (failEarly) !res.isValid
+    else if (failInvalid) res.isInvalid
     else false
+  }
 
   def verify(vcs: Seq[VC], stopWhen: VCResult => Boolean = defaultStop): Map[VC, VCResult] = {
     val sf = ctx.options.findOption(inox.optTimeout) match {
