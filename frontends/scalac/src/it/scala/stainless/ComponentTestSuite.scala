@@ -110,5 +110,6 @@ trait ComponentTestSuite extends inox.TestSuite with inox.ResourceUtils {
       }
 
     }
+    inox.Bench.reportS()
   }
 }

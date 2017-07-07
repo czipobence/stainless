@@ -38,6 +38,8 @@ trait VerificationSuite extends ComponentTestSuite {
   testAll("verification/invalid") { (report, _) =>
     assert(report.totalInvalid > 0, "There should be at least one invalid verification condition.")
   }
+
+  inox.Bench.reportS()
 }
 
 class SMTZ3VerificationSuite extends VerificationSuite {

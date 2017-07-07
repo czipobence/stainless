@@ -67,6 +67,7 @@ trait ProgramSimplifier { self =>
       case _ => None
     }, applyRec=true)(e)
   })
+
   private val removeAssertsAndRequires: VC => VC = transformVC(removeAssertsAndRequires)
   private def removeAssertsAndRequires(funs: Map[Identifier, FunDef]): Map[Identifier, FunDef] = {
     funs.mapValues { fd =>
