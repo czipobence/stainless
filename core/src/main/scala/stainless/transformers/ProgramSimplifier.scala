@@ -62,7 +62,7 @@ trait ProgramSimplifier { self =>
 
   private def removeAssertsAndRequires(e: Expr): Expr = inox.Bench.time("removing asserts and requires", {
     exprOps.preMap({
-      case a@Assert(_, _, body) => Some(body)
+      case Assert(_, _, body) => Some(body)
       case Require(pred, body) => Some(body)
       case _ => None
     }, applyRec=true)(e)

@@ -120,7 +120,7 @@ object VerificationComponent extends SimpleComponent {
 
         val simplify = p.ctx.options.findOptionOrDefault(optSimplify)
         val (simpleProgram, vcs2) =
-          if (true)
+          if (simplify)
             transformers.ProgramSimplifier.simplify(encoder.targetProgram)(vcs1)
           else
             (encoder.targetProgram, vcs1)

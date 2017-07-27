@@ -176,10 +176,8 @@ object VerificationChecker {
     object checker extends checkerInterface
     object cacheChecker extends checkerInterface with VerificationCache
 
-    if (vccache)
-      cacheChecker.verify(vcs)
-    else
-      checker.verify(vcs)
+    if (vccache) cacheChecker.verify(vcs)
+    else checker.verify(vcs)
   }
 
   def verify(p: StainlessProgram)(vcs: Seq[VC[p.trees.type]]): Map[VC[p.trees.type], VCResult[p.Model]] = {
