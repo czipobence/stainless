@@ -19,74 +19,55 @@ trait VerificationCache extends VerificationChecker { self =>
 
   type SubProgram = inox.Program { val trees: program.trees.type }
 
+  val uniq = new PrinterOptions(printUniqueIds = true)
+
   def buildDependencies(vc: VC): SubProgram = {
+
+    var adts = Set[(Identifier,ADTDefinition)]()
+    var fundefs = Set[FunDef]()
+    var traversedExpr = Set[Expr]()
+    var traversedTypes = Set[Type]()
+
+    val traverser = new TreeTraverser {
+      override def traverse(e: Expr): Unit = {
+        if (!traversedExpr.contains(e)) {
+          traversedExpr += e
+          // ctx.reporter.synchronized {
+          //   ctx.reporter.debug("TRAVERSING AN EXPRESSION")
+          //   ctx.reporter.debug(e)
+          //   ctx.reporter.debug("--------------")
+          // }
+          val callees = inox.Bench.time("getting transitive callees", {
+            exprOps.functionCallsOf(e).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
+          })
+          fundefs = fundefs ++ callees
+          super.traverse(e)
+        }
+      }
+      override def traverse(tpe: Type): Unit = {
+        if (!traversedTypes.contains(tpe)) {
+          traversedTypes += tpe
+          tpe match {
+            case adt: ADTType =>
+              val id = adt.id
+              val a = getADT(adt.id)
+              a.invariant.map(inv => traverse(inv.fullBody))
+              adts += ((id,a))
+            case _ => ()
+          }
+          super.traverse(tpe)
+        }
+      }
+    }
+
+    traverser.traverse(vc.condition)
+
     new inox.Program {
       val trees: program.trees.type = program.trees
-      val symbols = NoSymbols
+      val symbols = NoSymbols.withFunctions(fundefs.toSeq).withADTs(adts.map(_._2).toSeq)
       val ctx = program.ctx
     }
   }
-
-  // case class CompleteVC(funs: Map[String,String], programADTs: Map[String,(String,String)], vcs: Set[String]) extends Serializable {
-  //   def contains(vc: VC, program: self.program.type): Boolean = {
-  //     val vcString = vc.condition.serialize
-  //     vcs.contains(vcString) && {
-
-  //       var adts = Set[(Identifier,ADTDefinition)]()
-
-  //       inox.Bench.time("gathering adts", {
-  //         new TreeTraverser {
-  //           override def traverse(tpe: Type): Unit = {
-  //             tpe match {
-  //               case adt: ADTType =>
-  //                 val id = adt.id
-  //                 val a = getADT(adt.id)
-  //                 adts += ((id,a))
-  //               case _ => ()
-  //             }
-  //             super.traverse(tpe)
-  //           }
-  //         }.traverse(vc.condition)
-  //       })
-
-  //       val adtInvariants: Set[FunDef] = adts.flatMap(_._2.invariant)
-  //       val invariantsBodies = adtInvariants.map(_.fullBody)
-
-  //       val callees = inox.Bench.time("getting transitive callees", {
-  //         (invariantsBodies + vc.condition).flatMap(e =>
-  //           exprOps.functionCallsOf(e).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
-  //         )
-  //       })
-
-  //       ctx.reporter.synchronized {
-  //         ctx.reporter.debug("Checking containment of VC")
-  //         ctx.reporter.debug(vc)
-  //         ctx.reporter.debug("Program functions for the VC")
-  //         for (fd <- callees) {
-  //           ctx.reporter.debug(fd)
-  //           ctx.reporter.debug("\n\n")
-  //         }
-  //         ctx.reporter.debug("ADT definitions for the VC")
-  //         for (a <- adts) {
-  //           ctx.reporter.debug(a)
-  //           ctx.reporter.debug("\n\n")
-  //         }
-  //       }
-
-
-  //       adts.forall {
-  //         case (id,a) =>
-  //           val serializedID = id.serialize
-  //           programADTs.contains(serializedID) && programADTs(serializedID) == a.serialize
-  //       } &&
-  //       callees.forall { fd =>
-  //         val serializedID = fd.id.serialize
-  //         funs.contains(serializedID) && funs(serializedID) == fd.serialize
-  //       }
-
-  //     }
-  //   }
-  // }
 
 
   // def getVerifiedVCs(): VerifiedVCs = {
@@ -112,8 +93,16 @@ trait VerificationCache extends VerificationChecker { self =>
   override def checkVC(vc: VC, sf: SolverFactory { val program: self.program.type }) = {
     import VerificationCache._
 
-    val sp = inox.Bench.time("building dependencies", buildDependencies(vc))
-    val canonic = transformers.Canonization.canonize(sp)
+    val sp: SubProgram = inox.Bench.time("building dependencies", buildDependencies(vc))
+    val canonic = transformers.Canonization.canonize(sp.trees)(sp, vc)
+    VerificationCache.synchronized {
+      println("Dependencies of: " + vc.condition.asString(uniq))
+      println("================")
+      println(sp.asString)
+      println("================")
+      println("Canonic Form:")
+      println(canonic.asString)
+    }
     if (vccache.contains(canonic)) {
       ctx.reporter.synchronized {
         ctx.reporter.debug("The following VC has already been verified:")
@@ -132,6 +121,6 @@ trait VerificationCache extends VerificationChecker { self =>
 }
 
 object VerificationCache {
-  var vccache: scala.collection.concurrent.Map[Program,Unit] = 
+  var vccache: scala.collection.concurrent.Map[Program,Unit] =
     scala.collection.concurrent.TrieMap()
 }
