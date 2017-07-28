@@ -94,14 +94,19 @@ trait VerificationCache extends VerificationChecker { self =>
     import VerificationCache._
 
     val sp: SubProgram = inox.Bench.time("building dependencies", buildDependencies(vc))
-    val canonic = transformers.Canonization.canonize(sp.trees)(sp, vc)
+    val (canonic, newVC) = transformers.Canonization.canonize(sp.trees)(sp, vc)
     VerificationCache.synchronized {
       println("Dependencies of: " + vc.condition.asString(uniq))
       println("================")
-      println(sp.asString)
+      println(sp.symbols.asString(uniq))
       println("================")
       println("Canonic Form:")
-      println(canonic.asString)
+      println(newVC.condition.asString(uniq))
+      println("================")
+      println("Canonic Form of Dependencies:")
+      println("================")
+      println(canonic.symbols.asString(uniq))
+      println("END HUGE BLOCK ================")
     }
     if (vccache.contains(canonic)) {
       ctx.reporter.synchronized {

@@ -21,7 +21,8 @@ trait Canonization { selfcanonize =>
 
     def addRenaming(id: Identifier): Unit = {
       if (!renaming.contains(id)) {
-        val newId = new Identifier("x",localCounter,0)
+        val newId = new Identifier("x",localCounter,localCounter)
+        localCounter = localCounter + 1
         renaming += ((id, newId))
       }
     }
@@ -40,12 +41,6 @@ trait Canonization { selfcanonize =>
       }
     }
 
-    
-    verification.VerificationCache.synchronized {
-      println("Canonizing")
-      println(vc.condition)
-      println("End Condition")
-    }
     val newVCBody = idTransformer.transform(vc.condition)
 
     val newFundefs = syms.functions.values.map { fd =>
@@ -59,36 +54,54 @@ trait Canonization { selfcanonize =>
       ).copiedFrom(fd)
     }
 
-    val newADTs = syms.adts.values.map { adt => 
-      verification.VerificationCache.synchronized {
-        println("YAY====")
-        println("matching: " + adt)
-        println("YAY====")
-      }
-      adt match {
-      case sort: s.ADTSort => new t.ADTSort(
-        idTransformer.transform(sort.id),
-        sort.tparams map idTransformer.transform,
-        sort.cons,
-        sort.flags map idTransformer.transform
-      )
+    verification.VerificationCache.synchronized {
+      println("THE ADTS")
+      println(syms.adts)
+      println("================")
+    }
 
-      case cons: s.ADTConstructor => 
-        verification.VerificationCache.synchronized {
-          println("YO====")
-          println("I just found: " + cons)
-          println("YO====")
-        }
-        new t.ADTConstructor(
-          idTransformer.transform(cons.id),
-          cons.tparams map idTransformer.transform,
-          cons.sort,
-          cons.fields map idTransformer.transform,
-          cons.flags map idTransformer.transform
-        )
-    }}
+    // val newADTs = syms.adts.values.map { adt => 
+    //   verification.VerificationCache.synchronized {
+    //     println("YAY====")
+    //     println("matching: " + adt)
+    //     println("YAY====")
+    //   }
+    //   adt match {
+    //   case sort: s.ADTSort => new t.ADTSort(
+    //     idTransformer.transform(sort.id),
+    //     sort.tparams map idTransformer.transform,
+    //     sort.cons,
+    //     sort.flags map idTransformer.transform
+    //   )
 
-    val newSyms = NoSymbols.withFunctions(newFundefs.toSeq).withADTs(newADTs.toSeq)
+    //   case cons: s.ADTConstructor => 
+    //     verification.VerificationCache.synchronized {
+    //       println("YO====")
+    //       println("I just found: " + cons)
+    //       println("YO====")
+    //     }
+    //     val v = new t.ADTConstructor(
+    //       idTransformer.transform(cons.id),
+    //       cons.tparams map idTransformer.transform,
+    //       cons.sort,
+    //       cons.fields map idTransformer.transform,
+    //       cons.flags map idTransformer.transform
+    //     )
+    //     verification.VerificationCache.synchronized {
+    //       println("YO====")
+    //       println("I just DID: " + cons)
+    //       println("YO====")
+    //     }
+    //     v
+    // }}
+
+    verification.VerificationCache.synchronized {
+      println("i got the new ADTS")
+      println(syms.adts)
+      println("================")
+    }
+
+    val newSyms = NoSymbols.withFunctions(newFundefs.toSeq)//.withADTs(newADTs.toSeq)
 
     (newSyms, verification.VC[trees.type](
       newVCBody,
@@ -102,16 +115,16 @@ trait Canonization { selfcanonize =>
 object Canonization {
   def canonize(thetrees: stainless.ast.Trees)
               (p: inox.Program { val trees: thetrees.type }, vc: verification.VC[thetrees.type]): 
-                inox.Program { val trees: thetrees.type } = {
+                (inox.Program { val trees: thetrees.type }, verification.VC[thetrees.type]) = {
     object canonizer extends Canonization {
       override val trees: p.trees.type = p.trees
     }
 
     val (newSymbols, newVC) = canonizer.transform(p.symbols, vc)
-    new inox.Program {
+    (new inox.Program {
       val trees: p.trees.type = p.trees
       val symbols = newSymbols
       val ctx = p.ctx
-    }
+    }, newVC)
   }
 }
