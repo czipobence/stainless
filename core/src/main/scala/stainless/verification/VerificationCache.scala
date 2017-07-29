@@ -32,11 +32,6 @@ trait VerificationCache extends VerificationChecker { self =>
       override def traverse(e: Expr): Unit = {
         if (!traversedExpr.contains(e)) {
           traversedExpr += e
-          // ctx.reporter.synchronized {
-          //   ctx.reporter.debug("TRAVERSING AN EXPRESSION")
-          //   ctx.reporter.debug(e)
-          //   ctx.reporter.debug("--------------")
-          // }
           val callees = inox.Bench.time("getting transitive callees", {
             exprOps.functionCallsOf(e).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
           })
@@ -94,29 +89,39 @@ trait VerificationCache extends VerificationChecker { self =>
     import VerificationCache._
 
     val sp: SubProgram = inox.Bench.time("building dependencies", buildDependencies(vc))
-    val (canonic, newVC) = transformers.Canonization.canonize(sp.trees)(sp, vc)
-    VerificationCache.synchronized {
-      println("Dependencies of: " + vc.condition.asString(uniq))
-      println("================")
-      println(sp.symbols.asString(uniq))
-      println("================")
-      println("Canonic Form:")
-      println(newVC.condition.asString(uniq))
-      println("================")
-      println("Canonic Form of Dependencies:")
-      println("================")
-      println(canonic.symbols.asString(uniq))
-      println("END HUGE BLOCK ================")
+    val canonic = transformers.Canonization.canonize(sp.trees)(sp, vc)
+    ctx.reporter.synchronized {
+      ctx.reporter.debug("Dependencies of: " + vc.condition.asString(uniq))
+      ctx.reporter.debug("================")
+      ctx.reporter.debug(sp.symbols.asString(uniq))
+      ctx.reporter.debug("================")
+      ctx.reporter.debug("Canonic Form:")
+      ctx.reporter.debug(canonic._2.condition.asString(uniq))
+      ctx.reporter.debug("================")
+      ctx.reporter.debug("Canonic Form of Dependencies:")
+      ctx.reporter.debug("================")
+      ctx.reporter.debug(canonic._1.symbols.asString(uniq))
+      ctx.reporter.debug("================")
     }
     if (vccache.contains(canonic)) {
       ctx.reporter.synchronized {
-        ctx.reporter.debug("The following VC has already been verified:")
-        ctx.reporter.debug(vc)
-        ctx.reporter.debug("--------------")
+        ctx.reporter.warning("The following VC has already been verified:")
+        ctx.reporter.warning(vc)
+        ctx.reporter.warning("--------------")
       }
       VCResult(VCStatus.Valid, None, Some(0))
     }
     else {
+      // ctx.reporter.synchronized {
+      //   println("current cache")
+      //   for (((p, vc), _) <- vccache) {
+      //     println("=========")
+      //     println(p.symbols.toString)
+      //     println(vc.condition.toString)
+      //     println("=========")
+      //   }
+      //   println("end cache")
+      // }
       val result = inox.Bench.time("checking VC", super.checkVC(vc,sf))
       vccache += ((canonic, ()))
       result
@@ -126,6 +131,7 @@ trait VerificationCache extends VerificationChecker { self =>
 }
 
 object VerificationCache {
-  var vccache: scala.collection.concurrent.Map[Program,Unit] =
+  var vccache: scala.collection.concurrent.Map[(Program, verification.VC[_]),Unit] =
     scala.collection.concurrent.TrieMap()
+
 }

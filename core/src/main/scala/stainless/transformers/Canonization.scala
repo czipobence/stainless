@@ -8,10 +8,10 @@ import stainless.extraction.inlining.Trees
 trait Canonization { selfcanonize =>
 
   val trees: stainless.ast.Trees
-  val s: trees.type = trees
-  val t: trees.type = trees
+  lazy val s: selfcanonize.trees.type = selfcanonize.trees
+  lazy val t: selfcanonize.trees.type = selfcanonize.trees
 
-  import trees._
+  import selfcanonize.trees._
 
   type VC = verification.VC[trees.type]
 
@@ -54,54 +54,24 @@ trait Canonization { selfcanonize =>
       ).copiedFrom(fd)
     }
 
-    verification.VerificationCache.synchronized {
-      println("THE ADTS")
-      println(syms.adts)
-      println("================")
-    }
+    val newADTs = syms.adts.values.map { adt => adt match {
+      case sort: s.ADTSort => new t.ADTSort(
+        idTransformer.transform(sort.id),
+        sort.tparams map idTransformer.transform,
+        sort.cons,
+        sort.flags map idTransformer.transform
+      ).copiedFrom(adt)
 
-    // val newADTs = syms.adts.values.map { adt => 
-    //   verification.VerificationCache.synchronized {
-    //     println("YAY====")
-    //     println("matching: " + adt)
-    //     println("YAY====")
-    //   }
-    //   adt match {
-    //   case sort: s.ADTSort => new t.ADTSort(
-    //     idTransformer.transform(sort.id),
-    //     sort.tparams map idTransformer.transform,
-    //     sort.cons,
-    //     sort.flags map idTransformer.transform
-    //   )
+      case cons: s.ADTConstructor => new t.ADTConstructor(
+        idTransformer.transform(cons.id),
+        cons.tparams map idTransformer.transform,
+        cons.sort,
+        cons.fields map idTransformer.transform,
+        cons.flags map idTransformer.transform
+      ).copiedFrom(adt)
+    }}
 
-    //   case cons: s.ADTConstructor => 
-    //     verification.VerificationCache.synchronized {
-    //       println("YO====")
-    //       println("I just found: " + cons)
-    //       println("YO====")
-    //     }
-    //     val v = new t.ADTConstructor(
-    //       idTransformer.transform(cons.id),
-    //       cons.tparams map idTransformer.transform,
-    //       cons.sort,
-    //       cons.fields map idTransformer.transform,
-    //       cons.flags map idTransformer.transform
-    //     )
-    //     verification.VerificationCache.synchronized {
-    //       println("YO====")
-    //       println("I just DID: " + cons)
-    //       println("YO====")
-    //     }
-    //     v
-    // }}
-
-    verification.VerificationCache.synchronized {
-      println("i got the new ADTS")
-      println(syms.adts)
-      println("================")
-    }
-
-    val newSyms = NoSymbols.withFunctions(newFundefs.toSeq)//.withADTs(newADTs.toSeq)
+    val newSyms = NoSymbols.withFunctions(newFundefs.toSeq).withADTs(newADTs.toSeq)
 
     (newSyms, verification.VC[trees.type](
       newVCBody,
@@ -115,12 +85,13 @@ trait Canonization { selfcanonize =>
 object Canonization {
   def canonize(thetrees: stainless.ast.Trees)
               (p: inox.Program { val trees: thetrees.type }, vc: verification.VC[thetrees.type]): 
-                (inox.Program { val trees: thetrees.type }, verification.VC[thetrees.type]) = {
+                (inox.Program { val trees: thetrees.type }, verification.VC[thetrees.type])  = {
     object canonizer extends Canonization {
       override val trees: p.trees.type = p.trees
     }
 
-    val (newSymbols, newVC) = canonizer.transform(p.symbols, vc)
+    val (newSymbols,newVC) = canonizer.transform(p.symbols, vc)
+
     (new inox.Program {
       val trees: p.trees.type = p.trees
       val symbols = newSymbols
