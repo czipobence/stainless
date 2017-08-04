@@ -12,18 +12,18 @@ import org.json4s.JsonAST.{ JArray, JObject }
 
 import scala.language.existentials
 
-object optSimplify extends inox.FlagOptionDef("simplify", false)
+object optSimplify extends inox.FlagOptionDef("simplify", default = false)
 
 object VerificationComponent extends SimpleComponent {
   val name = "verification"
   val description = "Verification of function contracts"
 
   /**
-    * Strict Arithmetic Mode:
-    *
-    * Add assertions for integer overflow checking and other unexpected behaviour (e.g. x << 65).
-    */
-  val optStrictArithmetic = inox.FlagOptionDef("strictarithmetic", false)
+   * Strict Arithmetic Mode:
+   *
+   * Add assertions for integer overflow checking and other unexpected behaviour (e.g. x << 65).
+   */
+  val optStrictArithmetic = inox.FlagOptionDef("strictarithmetic", default = false)
 
   val trees: stainless.trees.type = stainless.trees
 
@@ -40,21 +40,22 @@ object VerificationComponent extends SimpleComponent {
     val program: Program { val trees: stainless.trees.type }
     val results: Map[VC[program.trees.type], VCResult[program.Model]]
 
-    import program.{ Model }
+    import program.Model
 
-    lazy val vrs = inox.Bench.time("vrs", results.toSeq.sortBy { case (vc, _) => (vc.fd.name, vc.kind.toString) })
+    lazy val vrs: Seq[(VC[program.trees.type], VCResult[program.Model])] =
+      results.toSeq.sortBy { case (vc, _) => (vc.fd.name, vc.kind.toString) }
 
-    lazy val totalConditions = inox.Bench.time("conds", vrs.size)
-    lazy val totalTime = inox.Bench.time("time", vrs.map(_._2.time.getOrElse(0l)).sum)
-    lazy val totalValid = inox.Bench.time("valid", vrs.count(_._2.isValid))
-    lazy val totalInvalid = inox.Bench.time("invalid", vrs.count(_._2.isInvalid))
-    lazy val totalUnknown = inox.Bench.time("unknown", vrs.count(_._2.isInconclusive))
+    lazy val totalConditions: Int = vrs.size
+    lazy val totalTime = vrs.map(_._2.time.getOrElse(0l)).sum
+    lazy val totalValid = vrs.count(_._2.isValid)
+    lazy val totalInvalid = vrs.count(_._2.isInvalid)
+    lazy val totalUnknown = vrs.count(_._2.isInconclusive)
 
     override val name = VerificationComponent.this.name
 
     override val width = 6
 
-    override def emitRowsAndStats: Option[(Seq[Row], ReportStats)] = if (totalConditions == 0) None else Some(
+    override def emitRowsAndStats: Option[(Seq[Row], ReportStats)] = if (totalConditions == 0) None else Some((
       vrs.map { case (vc, vr) =>
         Row(Seq(
           Cell(vc.fd),
@@ -62,18 +63,19 @@ object VerificationComponent extends SimpleComponent {
           Cell(vc.getPos),
           Cell(vr.status),
           Cell(vr.solver.map(_.name).getOrElse("")),
-          Cell(vr.time.map(t => f"${t/1000d}%3.3f").getOrElse(""))
+          Cell(vr.time.map(t => f"${t / 1000d}%3.3f").getOrElse(""))
         ))
-      }, ReportStats(totalConditions, totalTime, totalValid, totalInvalid, totalUnknown)
-    )
+      },
+      ReportStats(totalConditions, totalTime, totalValid, totalInvalid, totalUnknown)
+    ))
 
     override def emitJson: JArray = {
       def status2Json(status: VCStatus[Model]): JObject = status match {
         case Invalid(cex) =>
-          val info = cex.vars map { case (vd, e) => (vd.id.name -> e.toString) }
+          val info = cex.vars map { case (vd, e) => vd.id.name -> e.toString }
           ("status" -> status.name) ~ ("counterexample" -> info)
 
-        case status => ("status" -> status.name)
+        case _ => "status" -> status.name
       }
 
       val report: JArray = for { (vc, vr) <- vrs } yield {

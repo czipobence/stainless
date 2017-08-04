@@ -2,10 +2,10 @@
 
 package stainless.utils
 
-import scala.collection.mutable.{ ListBuffer, Map => MutableMap, Set => MutableSet, Queue => MutableQueue }
+import scala.collection.mutable.{ Map => MutableMap, Set => MutableSet, Queue => MutableQueue }
 
 /**
- * Describes a Graph of Computation that is incrementally refined/updated. [[Node]]s can be inserted
+ * Describe a Graph of Computation that is incrementally refined/updated. [[Node]]s can be inserted
  * (and updated) sequentially to build a full graph. After each [[update]], [[compute]] is called at
  * most once with the set of all nodes not yet computed -- which (indirect, possibly cyclic) dependencies
  * are all known -- with the dependencies themselves, hence a node might be passed to [[compute]]
@@ -59,7 +59,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
   /**
    * Produce some result for the set of nodes that are all ready.
    *
-   * It is guarantee that [[ready]] contains all the dependencies for all element of [[ready]].
+   * It is guaranteed that [[ready]] contains all the dependencies for all element of [[ready]].
    *
    * The result itself is not used by [[IncrementalComputationalGraph]].
    */
@@ -76,7 +76,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
 
   /**
    * Representation of a [[Node]]:
-   *  - It's [[id]] fully identifies a node (i.e. two nodes are equal <=> their ids are equal).
+   *  - Its [[id]] fully identifies a node (i.e. two nodes are equal <=> their ids are equal).
    *    This allows overriding a node simply by inserting a new node with the same identifier.
    *  - [[in]] denotes the input value for the node which is used for the computation.
    *  - [[deps]] holds the set of **direct** dependencies.
@@ -89,7 +89,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
       case _ => false
     }
 
-    override def hashCode = id.hashCode
+    override def hashCode: Int = id.hashCode
   }
 
   /**
@@ -206,8 +206,6 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
    * Compute the set of (indirect or not) dependencies,
    * or return None if any dependency is missing from the graph.
    */
-  // TODO if the graph is big, we might want to introduce some caching at this level.
-  //      It should get invalidated on insert/remove however.
   private def dependencies(n: Node): Option[Set[Node]] = {
     val seen = MutableSet[Node]()
     val deps = MutableSet[Node]()

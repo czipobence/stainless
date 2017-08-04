@@ -19,7 +19,7 @@ class FileWatcher(ctx: inox.Context, files: Set[File], action: () => Unit) {
   def run(): Unit = {
     // Watch each individual file for modification through their parent directories
     // (because a WatchService cannot observe files directly..., also we need to keep
-    // track of the modification time because we sometimes receive several event
+    // track of the modification time because we sometimes receive several events
     // for the same file...)
     val watcher = FileSystems.getDefault.newWatchService()
     val times = MutableMap[File, Long]() ++ (files map { f => f -> f.lastModified })
@@ -62,7 +62,9 @@ class FileWatcher(ctx: inox.Context, files: Set[File], action: () => Unit) {
 
         if (proceed) {
           ctx.reporter.info(s"Detecting some file modifications...: ${modified mkString ", "}")
+          ctx.interruptManager.unregisterForInterrupts(interruptible)
           action()
+          ctx.interruptManager.registerForInterrupts(interruptible)
           ctx.reporter.info(s"\n\nWaiting for source changes...\n\n")
         }
 

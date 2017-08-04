@@ -10,19 +10,20 @@ import scala.collection.mutable.{ Map => MutableMap, Set => MutableSet }
 /**
  * Keep track of the valid data (functions & classes) as they come, in a thread-safe fashion.
  *
- * Call [[update]] ([[remove]]) whenever new data is (no longer) available, and [[checkpoints]]
+ * Call [[update]] ([[remove]]) whenever new data is (no longer) available, and [[checkpoint]]
  * when all the data is available. New data can then be added through [[update]] calls and,
- * again, a [[checkpoints]] call. Every one of these calls yields a collection of [[xt.Symbols]]
+ * again, a [[checkpoint]] call. Every one of these calls yields a collection of [[xt.Symbols]]
  * that are self-contained programs, ready to be further processed.
  *
- * During the first [[update]]/[[remove]] - [[checkpoints]] cycle, the graph is updated as data
- * arrives. During the next cycles, the graph is frozen until the [[checkpoints]] to allow
+ * During the first [[update]]/[[remove]] - [[checkpoint]] cycle, the graph is updated as data
+ * arrives. During the next cycles, the graph is frozen until the [[checkpoint]] to allow
  * inconsistent state in the graph to not impact the computation.
+ *
  * TODO maybe [[freeze]]/[[unfreeze]] should be exposed and let the user manage this.
  *
- * Specific implementation of this trait have to provide a context and facilities to compute
+ * Specific implementations of this trait have to provide a context and facilities to compute
  * direct dependencies for functions and classes, as well as filters to identify data that
- * identify data that is of interest.
+ * is of interest.
  */
 trait Registry {
 
@@ -38,9 +39,11 @@ trait Registry {
    *      To do that, we can:
    *       - delay the insertion of classes in the graph,
    *       - once notified that everything was compiled, consider all classes as sealed,
-   *         and insert them all in the graph as usual (see [[checkpoints]]).
+   *         and insert them all in the graph as usual (see [[checkpoint]]).
    * FIXME However, this adds a BIG assumption on the runtime: no new class should be available!
    *       So, maybe we just don't want that???
+   *
+   * TODO when caching is implemented further in the pipeline, s/Option/Seq/.
    */
   def update(classes: Seq[xt.ClassDef], functions: Seq[xt.FunDef]): Option[xt.Symbols] = {
     def isReady(cd: xt.ClassDef): Boolean = getTopLevels(classes, cd) match {
@@ -73,16 +76,16 @@ trait Registry {
     val classIds = classes map { _.id }
     val funIds = functions map { _.id }
     knownClasses --= classIds
-    (classIds ++ funIds) foreach { graph.remove(_) }
+    (classIds ++ funIds) foreach graph.remove
   }
 
   /**
    * To be called once every compilation unit were extracted.
    */
-  def checkpoints(): Option[xt.Symbols] = {
+  def checkpoint(): Option[xt.Symbols] = {
     val defaultRes = process(knownClasses.values.toSeq, Seq.empty)
     val res = if (frozen) {
-      assert(defaultRes == None)
+      assert(defaultRes.isEmpty)
       graph.unfreeze() map { case (cls, funs) => xt.NoSymbols.withClasses(cls.toSeq).withFunctions(funs.toSeq) }
     } else {
       frozen = true
@@ -119,7 +122,7 @@ trait Registry {
   private var frozen = false
   private val graph = new IncrementalComputationalGraph[Identifier, NodeValue, Result] {
     override def compute(ready: Set[(Identifier, NodeValue)]): Result = {
-      (EmptyResult /: ready) { case ((cls, funs), (id, node)) =>
+      (EmptyResult /: ready) { case ((cls, funs), (_, node)) =>
         node match {
           case Left(cd) => (cls + cd, funs)
           case Right(fd) => (cls, funs + fd)
@@ -247,15 +250,15 @@ trait Registry {
   private def getTopLevels(classes: Seq[xt.ClassDef], cd: xt.ClassDef): Option[Set[xt.ClassDef]] = try {
     Some(getTopLevelsImpl(classes, cd))
   } catch {
-    case IncompleteHierarchy(cd, parent, classes) => None
+    case IncompleteHierarchy(_, _, _) => None
   }
 
   /** Same as [[getTopLevels]], but assuming that all dependencies are known. */
   private def forceGetTopLevels(classes: Seq[xt.ClassDef], cd: xt.ClassDef): Set[xt.ClassDef] = try {
     getTopLevelsImpl(classes, cd)
   } catch {
-    case IncompleteHierarchy(cd, parent, classes) =>
-      ctx.reporter.internalError(s"Couldn't find parent $parent of $cd in <${classes map { _.id } mkString ", "}>")
+    case IncompleteHierarchy(id, parent, universe) =>
+      ctx.reporter.internalError(s"Couldn't find parent $parent of $id in <${universe map { _.id } mkString ", "}>")
   }
 
 
@@ -282,13 +285,13 @@ trait Registry {
     // information from functions' flags:
     //  - keep only invariants;
     //  - identify the class it belongs to;
-    //  - project the function unto its id;
+    //  - project the function onto its id;
     //  - group info by class id;
     //  - ensures that at most one invariant is defined by class.
     val db: Map[Identifier, Option[Identifier]] =
       functions collect {
         case fd if fd.flags contains xt.IsInvariant =>
-          val cid = fd.flags collectFirst { case xt.IsMethodOf(cid) => cid } getOrElse {
+          val cid = fd.flags collectFirst { case xt.IsMethodOf(id) => id } getOrElse {
             ctx.reporter.internalError(s"Expected to find a IsMethodOf flag for invariant function ${fd.id}")
           }
 

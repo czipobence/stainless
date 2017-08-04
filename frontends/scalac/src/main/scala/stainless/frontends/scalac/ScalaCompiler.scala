@@ -114,7 +114,7 @@ object ScalaCompiler {
 
     override def apply(ctx: inox.Context, compilerArgs: Seq[String], callback: CallBack): Frontend =
       new ThreadedFrontend(callback, ctx) {
-        var underlying: ScalaCompiler#Run = null
+        var underlying: ScalaCompiler#Run = _
         val cache = SymbolMapping.empty
 
         val args = allCompilerArguments(compilerArgs)
@@ -143,7 +143,7 @@ object ScalaCompiler {
       }
   }
 
-  /** Let the frontend analyse the arguments to understand which files should be compiled. */
+  /** Let the frontend analyses the arguments to understand which files should be compiled. */
   private def getFiles(compilerArgs: Seq[String], ctx: inox.Context, settings: NSCSettings): List[String] = {
     val command = new CompilerCommand(compilerArgs.toList, settings) {
       override val cmdName = "stainless"
