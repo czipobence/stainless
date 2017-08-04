@@ -27,23 +27,14 @@ trait Canonization { selfcanonize =>
       }
     }
 
-    object idTransformer extends inox.ast.TreeTransformer {
-      val s: selfcanonize.trees.type = selfcanonize.trees
-      val t: selfcanonize.trees.type = selfcanonize.trees
+    var traversed = Set[Identifier]()
 
-      override def transform(id: Identifier): Identifier = {
-        addRenaming(id)
-        renaming(id)
-      }
-    }
+    // Map from old identifiers to new fundefs
+    var transformedFunctions = Map[Identifier, FunDef]()
+    // Map from old identifiers to new ADTs
+    var transformedADTs = Map[Identifier, ADTDefinition]()
 
-    val newVCBody = idTransformer.transform(vc.condition)
-
-    /** Should be changed so that functions are traversed in the order they
-      * appear in `vc.condition`
-      */
-
-    val newFundefs = syms.functions.values.map { fd =>
+    def transformFunDef(fd: FunDef): FunDef = {
       new FunDef(
         idTransformer.transform(fd.id),
         fd.tparams map idTransformer.transform,
@@ -54,7 +45,16 @@ trait Canonization { selfcanonize =>
       ).copiedFrom(fd)
     }
 
-    val newADTs = syms.adts.values.map { adt => adt match {
+    def exploreFunDef(id: Identifier): Unit = {
+      if (syms.functions.contains(id) && !traversed(id)) {
+        traversed += id
+        val fd = syms.functions(id)
+        val newFD = transformFunDef(fd)
+        transformedFunctions += ((id, newFD))
+      }
+    }
+
+    def transformADT(adt: ADTDefinition): ADTDefinition = adt match {
       case sort: s.ADTSort => new t.ADTSort(
         idTransformer.transform(sort.id),
         sort.tparams map idTransformer.transform,
@@ -69,7 +69,44 @@ trait Canonization { selfcanonize =>
         cons.fields map idTransformer.transform,
         cons.flags map idTransformer.transform
       ).copiedFrom(adt)
-    }}
+    }
+
+    def exploreADT(id: Identifier): Unit = {
+      if (syms.adts.contains(id) && !traversed(id)) {
+        traversed += id
+        val adt = syms.adts(id)
+        val newADT = transformADT(adt)
+        transformedADTs += ((id, newADT))
+      }
+    }
+
+    object idTransformer extends inox.ast.TreeTransformer {
+      val s: selfcanonize.trees.type = selfcanonize.trees
+      val t: selfcanonize.trees.type = selfcanonize.trees
+
+      override def transform(id: Identifier): Identifier = {
+        addRenaming(id)
+        exploreFunDef(id)
+        exploreADT(id)
+        renaming(id)
+      }
+    }
+
+    val newVCBody = idTransformer.transform(vc.condition)
+
+    /** Should be changed so that functions are traversed in the order they
+      * appear in `vc.condition`
+      */
+
+    val newFundefs = syms.functions.values.map { fd => 
+      exploreFunDef(fd.id)
+      transformedFunctions(fd.id)
+    }
+
+    val newADTs = syms.adts.values.map { adt =>
+      exploreADT(adt.id)
+      transformedADTs(adt.id)
+    }
     val newSyms = NoSymbols.withFunctions(newFundefs.toSeq).withADTs(newADTs.toSeq)
 
     (newSyms, newVCBody)

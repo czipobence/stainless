@@ -138,7 +138,7 @@ trait VerificationCache extends VerificationChecker { self =>
 }
 
 object VerificationCache {
-  var vccache = scala.collection.concurrent.TrieMap[Any,Unit]()
+  var vccache = scala.collection.concurrent.TrieMap[(inox.ast.Trees#Symbols, inox.ast.Trees#Expr),Unit]()
     
   def contains(tt: inox.ast.Trees)(p: (tt.Symbols, tt.Expr)) = {
     vccache.contains(p)
