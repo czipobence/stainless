@@ -276,13 +276,13 @@ trait TreeDeconstructor extends holes.TreeDeconstructor {
     case _ => super.deconstruct(pattern)
   }
 
-  override def deconstruct(tpe: s.Type): (Seq[s.Type], Seq[s.Flag], (Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
-    case s.ClassType(id, tps) => (tps, Seq(), (tps, _) => t.ClassType(id, tps))
-    case s.AnyType => (Seq(), Seq(), (_, _) => t.AnyType)
-    case s.NothingType => (Seq(), Seq(), (_, _) => t.NothingType)
-    case s.UnionType(tps) => (tps, Seq(), (tps, _) => t.UnionType(tps))
-    case s.IntersectionType(tps) => (tps, Seq(), (tps, _) => t.IntersectionType(tps))
-    case s.TypeBounds(lo, hi) => (Seq(lo, hi), Seq(), (tps, _) => t.TypeBounds(tps(0), tps(1)))
+  override def deconstruct(tpe: s.Type): (Option[Identifier], Seq[s.Type], Seq[s.Flag], (Option[Identifier], Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
+    case s.ClassType(id, tps) => (Some(id), tps, Seq(), (newId, tps, _) => t.ClassType(newId.get, tps))
+    case s.AnyType => (None, Seq(), Seq(), (_, _, _) => t.AnyType)
+    case s.NothingType => (None, Seq(), Seq(), (_, _, _) => t.NothingType)
+    case s.UnionType(tps) => (None, tps, Seq(), (_, tps, _) => t.UnionType(tps))
+    case s.IntersectionType(tps) => (None, tps, Seq(), (_, tps, _) => t.IntersectionType(tps))
+    case s.TypeBounds(lo, hi) => (None, Seq(lo, hi), Seq(), (_, tps, _) => t.TypeBounds(tps(0), tps(1)))
     case _ => super.deconstruct(tpe)
   }
 

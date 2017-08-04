@@ -244,7 +244,7 @@ private class CanonicalFormBuilderImpl {
       throw new java.lang.IllegalArgumentException(s"Unknown code for type ${typ.getClass}")
     }
 
-    val (tps, _, _) = xt.deconstructor.deconstruct(typ)
+    val (_, tps, _, _) = xt.deconstructor.deconstruct(typ)
 
     // Format is:
     //  - type code

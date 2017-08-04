@@ -12,6 +12,9 @@ import org.json4s.JsonAST.{ JArray, JObject }
 
 import scala.language.existentials
 
+/**
+ * Enable simplification of VCs
+ */
 object optSimplify extends inox.FlagOptionDef("simplify", default = false)
 
 object VerificationComponent extends SimpleComponent {

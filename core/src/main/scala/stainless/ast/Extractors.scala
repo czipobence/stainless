@@ -133,8 +133,8 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
     case _ => super.deconstruct(expr)
   }
 
-  override def deconstruct(tpe: s.Type): (Seq[s.Type], Seq[s.Flag], (Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
-    case s.ArrayType(base) => (Seq(base), Seq(), (tps, _) => t.ArrayType(tps(0)))
+  override def deconstruct(tpe: s.Type): (Option[Identifier], Seq[s.Type], Seq[s.Flag], (Option[Identifier], Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
+    case s.ArrayType(base) => (None, Seq(base), Seq(), (_, tps, _) => t.ArrayType(tps(0)))
     case _ => super.deconstruct(tpe)
   }
 
