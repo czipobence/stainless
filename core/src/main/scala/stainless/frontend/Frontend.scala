@@ -64,7 +64,7 @@ abstract class ThreadedFrontend(callback: CallBack, ctx: inox.Context) extends F
   protected def onEnd(): Unit // Called when the thread successfully ends (after callback cleanup).
   protected def onStop(thread: Thread): Unit // Called when the user wants to interrupt the frontend.
 
-  final override def run(): Unit = {
+  final override def run(): Unit = inox.Bench.time("ThreadedFronted call to run", {
     assert(!isRunning)
 
     val runnable = new Runnable {
@@ -84,7 +84,7 @@ abstract class ThreadedFrontend(callback: CallBack, ctx: inox.Context) extends F
     })
 
     thread.start()
-  }
+  })
 
   final override def isRunning: Boolean = thread != null && thread.isAlive
 

@@ -14,9 +14,9 @@ trait Tactic {
   }
 
   def generateVCs(id: Identifier): Seq[VC] = {
-    inox.Bench.time("postconditions", generatePostconditions(id)) ++
-    inox.Bench.time("preconditions", generatePreconditions(id)) ++
-    inox.Bench.time("correctness", generateCorrectnessConditions(id))
+    inox.Bench.time("generating postconditions", generatePostconditions(id)) ++
+    inox.Bench.time("generating preconditions", generatePreconditions(id)) ++
+    inox.Bench.time("generating correctness conditions", generateCorrectnessConditions(id))
   }
 
   def generatePostconditions(id: Identifier): Seq[VC]

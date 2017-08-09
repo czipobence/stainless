@@ -10,6 +10,8 @@ trait AntiAliasing extends inox.ast.SymbolTransformer with EffectsChecking { sel
   val trees: Trees
   lazy val s: trees.type = trees
   lazy val t: trees.type = trees
+
+  override val name = Some("AntiAliasing")
   import trees._
 
   def transform(syms: Symbols): Symbols = {

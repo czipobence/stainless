@@ -22,7 +22,7 @@ trait VerificationGenerator { self =>
       val tactic = getTactic(fd)
 
       if (fd.body.isDefined) {
-        inox.Bench.time("generating", tactic.generateVCs(id))
+        inox.Bench.time("generating VCs", tactic.generateVCs(id))
       } else {
         Nil
       }
@@ -53,7 +53,7 @@ object VerificationGenerator {
           defaultTactic
         }
     }
-    inox.Bench.time("generator generating", generator.generateVCs(funs))
+    generator.generateVCs(funs)
   }
 
 }

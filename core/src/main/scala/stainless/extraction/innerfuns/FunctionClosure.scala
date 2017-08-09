@@ -8,6 +8,8 @@ trait FunctionClosure extends inox.ast.SymbolTransformer { self =>
   val s: Trees
   val t: inlining.Trees
 
+  override val name = Some("Function Closure")
+
   def transform(symbols: s.Symbols): t.Symbols = {
     import s._
     import symbols._

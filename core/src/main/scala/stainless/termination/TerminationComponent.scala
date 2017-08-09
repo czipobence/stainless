@@ -20,6 +20,8 @@ object TerminationComponent extends SimpleComponent {
   object lowering extends inox.ast.SymbolTransformer {
     val s: extraction.trees.type = extraction.trees
     val t: extraction.trees.type = extraction.trees
+  
+    override val name = Some("Lowering")
 
     override def transform(syms: s.Symbols): t.Symbols = {
       syms.transform(new ast.TreeTransformer {

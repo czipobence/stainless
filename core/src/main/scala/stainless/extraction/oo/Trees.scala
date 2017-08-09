@@ -251,18 +251,22 @@ trait TreeDeconstructor extends holes.TreeDeconstructor {
   protected val s: Trees
   protected val t: Trees
 
-  override def deconstruct(e: s.Expr): (Seq[s.Variable], Seq[s.Expr], Seq[s.Type], (Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Expr) = e match {
+  override def deconstruct(e: s.Expr): 
+                          (
+                            Seq[Identifier], Seq[s.Variable], Seq[s.Expr], Seq[s.Type],
+                            (Seq[Identifier], Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Expr
+                          ) = e match {
     case s.MethodInvocation(rec, id, tps, args) =>
-      (Seq(), rec +: args, tps, (_, es, tps) => t.MethodInvocation(es(0), id, tps, es.tail))
+      (Seq(), Seq(), rec +: args, tps, (_, _, es, tps) => t.MethodInvocation(es(0), id, tps, es.tail))
 
     case s.ClassConstructor(ct, args) =>
-      (Seq(), args, Seq(ct), (_, es, tps) => t.ClassConstructor(tps.head.asInstanceOf[t.ClassType], es))
+      (Seq(), Seq(), args, Seq(ct), (_, _, es, tps) => t.ClassConstructor(tps.head.asInstanceOf[t.ClassType], es))
 
     case s.ClassSelector(expr, selector) =>
-      (Seq(), Seq(expr), Seq(), (_, es, _) => t.ClassSelector(es.head, selector))
+      (Seq(), Seq(), Seq(expr), Seq(), (_, _, es, _) => t.ClassSelector(es.head, selector))
 
     case s.This(ct) =>
-      (Seq(), Seq(), Seq(ct), (_, _, tps) => t.This(tps.head.asInstanceOf[t.ClassType]))
+      (Seq(), Seq(), Seq(), Seq(ct), (_, _, _, tps) => t.This(tps.head.asInstanceOf[t.ClassType]))
 
     case _ => super.deconstruct(e)
   }
@@ -276,22 +280,26 @@ trait TreeDeconstructor extends holes.TreeDeconstructor {
     case _ => super.deconstruct(pattern)
   }
 
-  override def deconstruct(tpe: s.Type): (Option[Identifier], Seq[s.Type], Seq[s.Flag], (Option[Identifier], Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
-    case s.ClassType(id, tps) => (Some(id), tps, Seq(), (newId, tps, _) => t.ClassType(newId.get, tps))
-    case s.AnyType => (None, Seq(), Seq(), (_, _, _) => t.AnyType)
-    case s.NothingType => (None, Seq(), Seq(), (_, _, _) => t.NothingType)
-    case s.UnionType(tps) => (None, tps, Seq(), (_, tps, _) => t.UnionType(tps))
-    case s.IntersectionType(tps) => (None, tps, Seq(), (_, tps, _) => t.IntersectionType(tps))
-    case s.TypeBounds(lo, hi) => (None, Seq(lo, hi), Seq(), (_, tps, _) => t.TypeBounds(tps(0), tps(1)))
+  override def deconstruct(tpe: s.Type): (Seq[Identifier], Seq[s.Type], Seq[s.Flag], (Seq[Identifier], Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
+    case s.ClassType(id, tps) => (Seq(id), tps, Seq(), (ids, tps, _) => t.ClassType(ids.head, tps))
+    case s.AnyType => (Seq(), Seq(), Seq(), (_, _, _) => t.AnyType)
+    case s.NothingType => (Seq(), Seq(), Seq(), (_, _, _) => t.NothingType)
+    case s.UnionType(tps) => (Seq(), tps, Seq(), (_, tps, _) => t.UnionType(tps))
+    case s.IntersectionType(tps) => (Seq(), tps, Seq(), (_, tps, _) => t.IntersectionType(tps))
+    case s.TypeBounds(lo, hi) => (Seq(), Seq(lo, hi), Seq(), (_, tps, _) => t.TypeBounds(tps(0), tps(1)))
     case _ => super.deconstruct(tpe)
   }
 
-  override def deconstruct(f: s.Flag): (Seq[s.Expr], Seq[s.Type], (Seq[t.Expr], Seq[t.Type]) => t.Flag) = f match {
-    case s.IsInvariant => (Seq(), Seq(), (_, _) => t.IsInvariant)
-    case s.IsAbstract => (Seq(), Seq() ,(_, _) => t.IsAbstract)
-    case s.IsSealed => (Seq(), Seq(), (_, _) => t.IsSealed)
-    case s.IsMethodOf(id) => (Seq(), Seq(), (_, _) => t.IsMethodOf(id))
-    case s.Bounds(lo, hi) => (Seq(), Seq(lo, hi), (_, tps) => t.Bounds(tps(0), tps(1)))
+  override def deconstruct(f: s.Flag): 
+                          (
+                            Seq[Identifier], Seq[s.Expr], Seq[s.Type], 
+                            (Seq[Identifier], Seq[t.Expr], Seq[t.Type]) => t.Flag
+                          ) = f match {
+    case s.IsInvariant => (Seq(), Seq(), Seq(), (_, _, _) => t.IsInvariant)
+    case s.IsAbstract => (Seq(), Seq(), Seq() ,(_, _, _) => t.IsAbstract)
+    case s.IsSealed => (Seq(), Seq(), Seq(), (_, _, _) => t.IsSealed)
+    case s.IsMethodOf(id) => (Seq(), Seq(), Seq(), (_, _, _) => t.IsMethodOf(id))
+    case s.Bounds(lo, hi) => (Seq(), Seq(), Seq(lo, hi), (_, _, tps) => t.Bounds(tps(0), tps(1)))
     case _ => super.deconstruct(f)
   }
 }

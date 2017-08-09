@@ -32,10 +32,10 @@ object VerificationComponent extends SimpleComponent {
 
   type Report = VerificationReport
 
-  val lowering = inox.Bench.time("lowering", inox.ast.SymbolTransformer(new ast.TreeTransformer {
+  val lowering = inox.ast.SymbolTransformer(new ast.TreeTransformer {
     val s: extraction.trees.type = extraction.trees
     val t: extraction.trees.type = extraction.trees
-  }))
+  })
 
   implicit val debugSection = DebugSectionVerification
 
@@ -103,54 +103,44 @@ object VerificationComponent extends SimpleComponent {
 
   def check(funs: Seq[Identifier], p: StainlessProgram): Map[VC[p.trees.type], VCResult[p.Model]] = {
     val injector = inox.Bench.time("assertion injector", AssertionInjector(p))
-    val encoder = inox.Bench.time("encoder", inox.ast.ProgramEncoder(p)(injector))
+    val encoder = inox.Bench.time("program encoder", inox.ast.ProgramEncoder(p)(injector))
 
     import encoder.targetProgram._
     import encoder.targetProgram.trees._
     import encoder.targetProgram.symbols._
 
-    inox.Bench.time("check", {
+    val toVerify = funs.sortBy(getFunction(_).getPos)
 
-      val toVerify = funs.sortBy(getFunction(_).getPos)
-
-      for (id <- toVerify) {
-        if (getFunction(id).flags contains "library") {
-          val fullName = id.fullName
-          ctx.reporter.warning(s"Forcing verification of $fullName which was assumed verified")
-        }
+    for (id <- toVerify) {
+      if (getFunction(id).flags contains "library") {
+        val fullName = id.fullName
+        ctx.reporter.warning(s"Forcing verification of $fullName which was assumed verified")
       }
+    }
 
-      inox.Bench.time("verificationChecker", {
-        val vcs1 = VerificationGenerator.gen(encoder.targetProgram)(funs)
+    val vcs1 = VerificationGenerator.gen(encoder.targetProgram)(funs)
 
-        val simplify = p.ctx.options.findOptionOrDefault(optSimplify)
-        val (simpleProgram, vcs2) =
-          if (simplify)
-            transformers.ProgramSimplifier.simplify(encoder.targetProgram)(vcs1)
-          else
-            (encoder.targetProgram, vcs1)
+    val simplify = p.ctx.options.findOptionOrDefault(optSimplify)
+    val (simpleProgram, vcs2) =
+      if (simplify)
+        transformers.ProgramSimplifier.simplify(encoder.targetProgram)(vcs1)
+      else
+        (encoder.targetProgram, vcs1)
 
-        VerificationChecker.verify(simpleProgram)(vcs2).mapValues {
-          case VCResult(VCStatus.Invalid(model), s, t) =>
-            val originalModel = changeModelProgram(model)(encoder.targetProgram)
-            VCResult(VCStatus.Invalid(originalModel.encode(encoder.reverse)), s, t)
-          case res => res.asInstanceOf[VCResult[p.Model]]
-        }
-      })
-    })
+    VerificationChecker.verify(simpleProgram)(vcs2).mapValues {
+      case VCResult(VCStatus.Invalid(model), s, t) =>
+        val originalModel = changeModelProgram(model)(encoder.targetProgram)
+        VCResult(VCStatus.Invalid(originalModel.encode(encoder.reverse)), s, t)
+      case res => res.asInstanceOf[VCResult[p.Model]]
+    }
   }
 
   def apply(funs: Seq[Identifier], p: StainlessProgram): VerificationReport = {
-    val v = inox.Bench.time("apply", {
-      val res = inox.Bench.time("apply/check", check(funs, p))
-
-      inox.Bench.time("verification report",
-        new VerificationReport {
-          val program: p.type = p
-          val results = res
-        }
-      )
-    })
-    v
+    val res = check(funs, p)
+    
+    new VerificationReport {
+      val program: p.type = p
+      val results = res
+    }
   }
 }

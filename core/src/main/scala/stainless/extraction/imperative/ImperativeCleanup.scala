@@ -15,6 +15,8 @@ trait ImperativeCleanup extends inox.ast.SymbolTransformer { self =>
   val s: Trees
   val t: innerfuns.Trees
 
+  override val name = Some("Imperative Cleanup")
+
   def transform(syms: s.Symbols): t.Symbols = {
     implicit val symbols = syms
 

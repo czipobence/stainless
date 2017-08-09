@@ -54,7 +54,7 @@ trait VerificationChecker { self =>
 
     try {
       ctx.reporter.debug("Checking Verification Conditions...")
-      inox.Bench.time("checking vcs", checkVCs(vcs, sf, stopWhen))
+      checkVCs(vcs, sf, stopWhen)
     } finally {
       sf.shutdown()
     }
@@ -93,7 +93,7 @@ trait VerificationChecker { self =>
     val s = sf.getNewSolver
 
     try {
-      val cond = inox.Bench.time("simplifyLets", simplifyLets(vc.condition))
+      val cond = inox.Bench.time("call to simplifyLets", simplifyLets(vc.condition))
       ctx.reporter.synchronized {
         ctx.reporter.info(s" - Now considering '${vc.kind}' VC for ${vc.fd} @${vc.getPos}...")
         ctx.reporter.debug(cond.asString)
@@ -105,7 +105,7 @@ trait VerificationChecker { self =>
       val vcres = try {
         s.assertCnstr(Not(cond))
 
-        val res = inox.Bench.time("model checking", s.check(Model))
+        val res = inox.Bench.time("call to solver", s.check(Model))
 
         val time = timer.stop()
 

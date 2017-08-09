@@ -22,6 +22,7 @@ trait Strengthener { self: OrderingRelation =>
   private lazy val ignorePosts = ctx.options.findOptionOrDefault(optIgnorePosts)
 
   private object postStrengthener extends IdentitySymbolTransformer {
+    override val name = Some("Post Strengthener")
     override def transform(syms: Symbols): Symbols =
       syms.withFunctions(strengthenedPost.flatMap {
         case (fd, post @ Some(_)) => Some(fd.copy(fullBody = exprOps.withPostcondition(fd.fullBody, post)))

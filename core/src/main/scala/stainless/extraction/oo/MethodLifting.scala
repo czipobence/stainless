@@ -9,6 +9,8 @@ import inox.utils.{NoPosition, Position}
 trait MethodLifting extends inox.ast.SymbolTransformer { self =>
   val s: Trees
   val t: Trees
+  
+  override val name = Some("Method Lifting")
 
   def transform(symbols: s.Symbols): t.Symbols = {
     import s._

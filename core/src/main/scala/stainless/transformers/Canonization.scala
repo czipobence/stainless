@@ -16,6 +16,9 @@ trait Canonization { selfcanonize =>
   type VC = verification.VC[trees.type]
 
   def transform(syms: s.Symbols, vc: VC): (t.Symbols, Expr) = {
+    // println("LET ME TRANSFORM PLEASE")
+    // println(syms)
+
     var localCounter = 0
     var renaming: Map[Identifier,Identifier] = Map()
 
@@ -54,21 +57,32 @@ trait Canonization { selfcanonize =>
       }
     }
 
-    def transformADT(adt: ADTDefinition): ADTDefinition = adt match {
-      case sort: s.ADTSort => new t.ADTSort(
-        idTransformer.transform(sort.id),
-        sort.tparams map idTransformer.transform,
-        sort.cons map idTransformer.transform,
-        sort.flags map idTransformer.transform
-      ).copiedFrom(adt)
+    def transformADT(adt: ADTDefinition): ADTDefinition = {
+      val newInvariant =  
+        adt.invariant(syms).map { fd =>
+          exploreFunDef(fd.id)
+          transformFunDef(fd)
+        }
+      adt match {
+        case sort: s.ADTSort => new t.ADTSort(
+          idTransformer.transform(sort.id),
+          sort.tparams map idTransformer.transform,
+          sort.cons map idTransformer.transform,
+          sort.flags map idTransformer.transform
+        ) {
+          override def invariant(implicit syms: Symbols) = newInvariant
+        }.copiedFrom(adt)
 
-      case cons: s.ADTConstructor => new t.ADTConstructor(
-        idTransformer.transform(cons.id),
-        cons.tparams map idTransformer.transform,
-        cons.sort map idTransformer.transform,
-        cons.fields map idTransformer.transform,
-        cons.flags map idTransformer.transform
-      ).copiedFrom(adt)
+        case cons: s.ADTConstructor => new t.ADTConstructor(
+          idTransformer.transform(cons.id),
+          cons.tparams map idTransformer.transform,
+          cons.sort map idTransformer.transform,
+          cons.fields map idTransformer.transform,
+          cons.flags map idTransformer.transform
+        ) {
+          override def invariant(implicit syms: Symbols) = newInvariant
+        }.copiedFrom(adt)
+      }
     }
 
     def exploreADT(id: Identifier): Unit = {

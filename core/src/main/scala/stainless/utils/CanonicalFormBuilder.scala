@@ -158,7 +158,8 @@ private class CanonicalFormBuilderImpl {
     }
 
     // Use the deconstructor to extract **most** of the expression's information.
-    val (vars, es, tps, _) = xt.deconstructor.deconstruct(e)
+    // FIXME: store ids as well?
+    val (ids, vars, es, tps, _) = xt.deconstructor.deconstruct(e)
 
     // Format is:
     //  - expression code

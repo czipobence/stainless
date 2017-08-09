@@ -12,6 +12,7 @@ import java.io.FileOutputStream
 import inox.solvers.SolverFactory
 
 object DebugSectionCache extends inox.DebugSection("vccache")
+object DebugSectionCacheMiss extends inox.DebugSection("cachemiss")
 
 class AppendingObjectOutputStream(os: java.io.OutputStream) extends ObjectOutputStream(os) {
 
@@ -59,8 +60,17 @@ trait VerificationCache extends VerificationChecker { self =>
             case adt: ADTType =>
               val id = adt.id
               val a = getADT(adt.id)
-              a.invariant.map(inv => traverse(inv.fullBody))
+              a.invariant.map(inv => {
+                fundefs += inv
+                traverse(inv.fullBody)
+              })
               adts += ((id,a))
+              // FIXME: what about invariants for the constructors of the sort?
+              a match {
+                case sort: ADTSort => 
+                  adts ++= (sort.cons.map(consId => (consId, getADT(consId))))
+                case _ => ()
+              }
             case _ => ()
           }
           super.traverse(tpe)
@@ -80,22 +90,29 @@ trait VerificationCache extends VerificationChecker { self =>
   override def checkVC(vc: VC, sf: SolverFactory { val program: self.program.type }) = {
     import VerificationCache._
 
-    val sp: SubProgram = inox.Bench.time("building dependencies", buildDependencies(vc))
-    val canonic = transformers.Canonization.canonize(sp.trees)(sp, vc)
-    if (VerificationCache.contains(sp.trees)(canonic)) {
-      ctx.reporter.synchronized {
-        ctx.reporter.debug("The following VC has already been verified:")(DebugSectionCache)
-        ctx.reporter.debug(vc)(DebugSectionCache)
-        ctx.reporter.debug("--------------")(DebugSectionCache)
+    inox.Bench.time("checking VC with cache", {
+      val sp: SubProgram = inox.Bench.time("building dependencies", buildDependencies(vc))
+      val canonic = inox.Bench.time("canonizing", transformers.Canonization.canonize(sp.trees)(sp, vc))
+      if (VerificationCache.contains(sp.trees)(canonic)) {
+        ctx.reporter.synchronized {
+          ctx.reporter.debug("The following VC has already been verified:")(DebugSectionCache)
+          ctx.reporter.debug(vc.condition)(DebugSectionCache)
+          ctx.reporter.debug("--------------")(DebugSectionCache)
+        }
+        VCResult(VCStatus.Valid, None, Some(0))
       }
-      VCResult(VCStatus.Valid, None, Some(0))
-    }
-    else {
-      val result = inox.Bench.time("checking VC", super.checkVC(vc,sf))
-      VerificationCache.add(sp.trees)(canonic)
-      VerificationCache.addVCToPersistentCache(sp.trees)(canonic, vc.toString, ctx)
-      result
-    }
+      else {
+        ctx.reporter.synchronized {
+          ctx.reporter.debug("Cache miss:")(DebugSectionCacheMiss)
+          ctx.reporter.debug(serialize(sp.trees)(canonic))(DebugSectionCacheMiss)
+          ctx.reporter.debug("--------------")(DebugSectionCacheMiss)
+        }
+        val result = inox.Bench.time("checking VC from scratch", super.checkVC(vc,sf))
+        VerificationCache.add(sp.trees)(canonic)
+        VerificationCache.addVCToPersistentCache(sp.trees)(canonic, vc.toString, ctx)
+        result
+      }
+    })
   }
 
 }
@@ -106,16 +123,20 @@ object VerificationCache {
   inox.Bench.time("loading persistent cache", VerificationCache.loadPersistentCache())
     
   def contains(tt: inox.ast.Trees)(p: (tt.Symbols, tt.Expr)) = {
-    vccache.contains(serialize(tt)(p))
+    inox.Bench.time("looking up VC in cache Map",
+      vccache.contains(serialize(tt)(p))
+    )
   }
     
   def add(tt: inox.ast.Trees)(p: (tt.Symbols, tt.Expr)) = {
-    vccache += ((serialize(tt)(p), ()))
+    inox.Bench.time("adding VC to cache Map",
+      vccache += ((serialize(tt)(p), ()))
+    )
   }
 
   def serialize(tt: inox.ast.Trees)(p: (tt. Symbols, tt. Expr)): String = {
     val uniq = new tt.PrinterOptions(printUniqueIds = true)
-    inox.Bench.time("serializing", 
+    inox.Bench.time("transforming program to String", 
       p._1.asString(uniq) + "\n#\n" + p._2.asString(uniq)
     )
   }
@@ -124,20 +145,20 @@ object VerificationCache {
 
     val task = new java.util.concurrent.Callable[String] {
       override def call(): String = {
-        MainHelpers.synchronized {
-          // println("WRITING VC")
-          val oos = 
-            if (new java.io.File(cacheFile).exists) {
-              ctx.reporter.debug("Opening already existing cache file.")(DebugSectionCache)
-              new AppendingObjectOutputStream(new FileOutputStream(cacheFile, true))
-            } else {
-              ctx.reporter.debug("Creating new cache file")(DebugSectionCache)
-              new ObjectOutputStream(new FileOutputStream(cacheFile))
-            }
-          oos.writeObject(serialize(tt)(p))
-          // println("FINISHED VC")
-          descr
-        }
+        inox.Bench.time("adding VC to persistent cache", 
+          MainHelpers.synchronized {
+            val oos = 
+              if (new java.io.File(cacheFile).exists) {
+                ctx.reporter.debug("Opening already existing cache file.")(DebugSectionCache)
+                new AppendingObjectOutputStream(new FileOutputStream(cacheFile, true))
+              } else {
+                ctx.reporter.debug("Creating new cache file")(DebugSectionCache)
+                new ObjectOutputStream(new FileOutputStream(cacheFile))
+              }
+            oos.writeObject(serialize(tt)(p))
+            descr
+          }
+        )
       }
     }
     MainHelpers.executor.submit(task)
@@ -145,32 +166,31 @@ object VerificationCache {
   
   def loadPersistentCache(): Unit = {
     if (new java.io.File(cacheFile).exists) {
-      MainHelpers.synchronized {
-        // println("READING THE WHOLE CACHE")
-        val ois = new ObjectInputStream(new FileInputStream(cacheFile))
-        // println("OPENED THE OBJECT INPUT STREAM")
-        try {
-          // println("WHILING")
-          while (true) {
-            val s = ois.readObject.asInstanceOf[String]
-            vccache += ((s, ()))
+      inox.Bench.time("loading persistent cache", {
+        MainHelpers.synchronized {
+          val ois = new ObjectInputStream(new FileInputStream(cacheFile))
+          try {
+            while (true) {
+              val s = ois.readObject.asInstanceOf[String]
+              // println("VERIFIED VC\n" + s + "\n---")
+              vccache += ((s, ()))
+            }
+          } catch {
+            case e: java.net.SocketTimeoutException => 
+              // ctx.reporter.debug("Time out while reading cache")(DebugSectionCache)
+            case e: java.io.EOFException =>
+              // println("FINISHED READING CACHE")
+              // ctx.reporter.debug("Reached end of cache file")(DebugSectionCache)
+              ois.close()
+            case e: java.io.IOException =>
+              // ctx.reporter.debug("IO Error while reading cache")(DebugSectionCache)
+              e.printStackTrace()
+            case e: Throwable =>
+              // ctx.reporter.debug("Error while reading cache")(DebugSectionCache)
+              e.printStackTrace()
           }
-        } catch {
-          case e: java.net.SocketTimeoutException => 
-            // ctx.reporter.debug("Time out while reading cache")(DebugSectionCache)
-          case e: java.io.EOFException =>
-            // println("FINISHED READING CACHE")
-            // ctx.reporter.debug("Reached end of cache file")(DebugSectionCache)
-            ois.close()
-          case e: java.io.IOException =>
-            // ctx.reporter.debug("IO Error while reading cache")(DebugSectionCache)
-            e.printStackTrace()
-          case e: Throwable =>
-            // ctx.reporter.debug("Error while reading cache")(DebugSectionCache)
-            e.printStackTrace()
         }
-        // println("SYNCHRONIZED END")
-      }
+      })
     }
   }
 

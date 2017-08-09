@@ -66,9 +66,11 @@ trait MainHelpers extends inox.MainHelpers {
   override protected def getDebugSections: Set[inox.DebugSection] = super.getDebugSections ++ Set(
     verification.DebugSectionVerification,
     verification.DebugSectionCache,
+    verification.DebugSectionCacheMiss,
     termination.DebugSectionTermination,
     DebugSectionExtraction,
-    frontend.DebugSectionFrontend
+    frontend.DebugSectionFrontend,
+    inox.Bench.DebugSectionBench
   )
 
   override protected def displayVersion(reporter: inox.Reporter): Unit = {
@@ -105,13 +107,13 @@ trait MainHelpers extends inox.MainHelpers {
       watcher.run()
     } else {
       // Process reports: print summary/export to JSON
-      val reports: Seq[AbstractReport] = compiler.getReports
-      reports foreach { _.emit(ctx) }
+      val reports: Seq[AbstractReport] = inox.Bench.time("Getting reports", compiler.getReports)
+      reports foreach { p => inox.Bench.time("Emitting report", p.emit(ctx)) }
 
       ctx.options.findOption(optJson) foreach { file =>
         val output = if (file.isEmpty) optJson.default else file
         ctx.reporter.info(s"Printing JSON summary to $output")
-        exportJson(reports, output)
+        inox.Bench.time("call to exportJson", exportJson(reports, output))
       }
     }
 
@@ -120,10 +122,12 @@ trait MainHelpers extends inox.MainHelpers {
     }
 
     // Shutdown the pool for a clean exit.
-    val unexecuted = MainHelpers.executor.shutdownNow()
+    val unexecuted = inox.Bench.time("Shutting down pool", MainHelpers.executor.shutdownNow())
     if (!ctx.interruptManager.isInterrupted && unexecuted.size != 0) {
       ctx.reporter.error("Some tasks were not run (" + unexecuted.size + ")")
     }
+
+    inox.Bench.reportS(ctx)
   } catch {
     case _: inox.FatalError => System.exit(1)
   }

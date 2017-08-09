@@ -10,6 +10,8 @@ trait ImperativeCodeElimination extends inox.ast.SymbolTransformer {
   lazy val t: trees.type = trees
   import trees._
 
+  override val name = Some("Imperative Code Elimination")
+
   def transform(syms: Symbols): Symbols = {
     import syms._
     import exprOps._

@@ -12,6 +12,8 @@ trait FunctionInlining extends inox.ast.SymbolTransformer { self =>
   val s: Trees
   val t: extraction.Trees
 
+  override val name = Some("Function Inlining")
+
   def transform(symbols: s.Symbols): t.Symbols = {
     import s._
     import symbols._
@@ -67,7 +69,7 @@ trait FunctionInlining extends inox.ast.SymbolTransformer { self =>
           None
         } else {
           Some(transformer.transform(fd.copy(
-            fullBody = inox.Bench.time("inlineFunctionInvocations", inlineFunctionInvocations(fd.fullBody)),
+            fullBody = inox.Bench.time("call to inlineFunctionInvocations", inlineFunctionInvocations(fd.fullBody)),
             flags = fd.flags - Inline
           )))
         }

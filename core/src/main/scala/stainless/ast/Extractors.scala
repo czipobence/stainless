@@ -34,21 +34,25 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
       })
   }
 
-  override def deconstruct(expr: s.Expr): (Seq[s.Variable], Seq[s.Expr], Seq[s.Type], (Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Expr) = expr match {
+  override def deconstruct(expr: s.Expr): 
+                          (
+                            Seq[Identifier], Seq[s.Variable], Seq[s.Expr], Seq[s.Type], 
+                            (Seq[Identifier], Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Expr
+                          ) = expr match {
     case s.NoTree(tpe) =>
-      (Seq(), Seq(), Seq(tpe), (_, _, tps) => t.NoTree(tps.head))
+      (Seq(), Seq(), Seq(), Seq(tpe), (_, _, _, tps) => t.NoTree(tps.head))
     case s.Error(tpe, desc) =>
-      (Seq(), Seq(), Seq(tpe), (_, _, tps) => t.Error(tps.head, desc))
+      (Seq(), Seq(), Seq(), Seq(tpe), (_, _, _, tps) => t.Error(tps.head, desc))
     case s.Require(pred, body) =>
-      (Seq(), Seq(pred, body), Seq(), (_, es, _) => t.Require(es(0), es(1)))
+      (Seq(), Seq(), Seq(pred, body), Seq(), (_, _, es, _) => t.Require(es(0), es(1)))
     case s.Ensuring(body, pred) =>
-      (Seq(), Seq(body, pred), Seq(), (_, es, _) => t.Ensuring(es(0), es(1).asInstanceOf[t.Lambda]))
+      (Seq(), Seq(), Seq(body, pred), Seq(), (_, _, es, _) => t.Ensuring(es(0), es(1).asInstanceOf[t.Lambda]))
     case s.Assert(pred, error, body) =>
-      (Seq(), Seq(pred, body), Seq(), (_, es, _) => t.Assert(es(0), error, es(1)))
+      (Seq(), Seq(), Seq(pred, body), Seq(), (_, _, es, _) => t.Assert(es(0), error, es(1)))
     case s.Dontcheck(body) =>
-      (Seq(), Seq(body), Seq(), (_, es, _) => t.Dontcheck(es(0)))
+      (Seq(), Seq(), Seq(body), Seq(), (_, _, es, _) => t.Dontcheck(es(0)))
     case s.Pre(f) =>
-      (Seq(), Seq(f), Seq(), (_, es, _) => t.Pre(es.head))
+      (Seq(), Seq(), Seq(f), Seq(), (_, _, es, _) => t.Pre(es.head))
 
     case s.MatchExpr(scrut, cases) =>
 
@@ -86,7 +90,7 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
         (caze.optGuard.isDefined, pvs, caze.optGuard.toSeq ++ (caze.rhs +: pes), ptps, precons)
       }
 
-      (recCases.flatMap(_._2), scrut +: recCases.flatMap(_._3), recCases.flatMap(_._4), (vs, es, tps) => {
+      (Seq(), recCases.flatMap(_._2), scrut +: recCases.flatMap(_._3), recCases.flatMap(_._4), (_, vs, es, tps) => {
         val newScrut +: patEs = es
 
         var rvs = vs
@@ -113,35 +117,39 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
       })
 
     case s.FiniteArray(elems, base) =>
-      (Seq(), elems, Seq(base), (_, es, tps) => t.FiniteArray(es, tps.head))
+      (Seq(), Seq(), elems, Seq(base), (_, _, es, tps) => t.FiniteArray(es, tps.head))
 
     case s.LargeArray(elems, default, size, base) =>
       val (keys, values) = elems.toSeq.unzip
-      (Seq(), values :+ default :+ size, Seq(base), {
-        case (_, es :+ nd :+ ns, tps) => t.LargeArray((keys zip es).toMap, nd, ns, tps.head)
+      (Seq(), Seq(), values :+ default :+ size, Seq(base), {
+        case (_, _, es :+ nd :+ ns, tps) => t.LargeArray((keys zip es).toMap, nd, ns, tps.head)
       })
 
     case s.ArraySelect(array, index) =>
-      (Seq(), Seq(array, index), Seq(), (_, es, _) => t.ArraySelect(es(0), es(1)))
+      (Seq(), Seq(), Seq(array, index), Seq(), (_, _, es, _) => t.ArraySelect(es(0), es(1)))
 
     case s.ArrayUpdated(array, index, value) =>
-      (Seq(), Seq(array, index, value), Seq(), (_, es, _) => t.ArrayUpdated(es(0), es(1), es(2)))
+      (Seq(), Seq(), Seq(array, index, value), Seq(), (_, _, es, _) => t.ArrayUpdated(es(0), es(1), es(2)))
 
     case s.ArrayLength(array) =>
-      (Seq(), Seq(array), Seq(), (_, es, _) => t.ArrayLength(es.head))
+      (Seq(), Seq(), Seq(array), Seq(), (_, _, es, _) => t.ArrayLength(es.head))
 
     case _ => super.deconstruct(expr)
   }
 
-  override def deconstruct(tpe: s.Type): (Option[Identifier], Seq[s.Type], Seq[s.Flag], (Option[Identifier], Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
-    case s.ArrayType(base) => (None, Seq(base), Seq(), (_, tps, _) => t.ArrayType(tps(0)))
+  override def deconstruct(tpe: s.Type): (Seq[Identifier], Seq[s.Type], Seq[s.Flag], (Seq[Identifier], Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
+    case s.ArrayType(base) => (Seq(), Seq(base), Seq(), (_, tps, _) => t.ArrayType(tps(0)))
     case _ => super.deconstruct(tpe)
   }
 
-  override def deconstruct(f: s.Flag): (Seq[s.Expr], Seq[s.Type], (Seq[t.Expr], Seq[t.Type]) => t.Flag) = f match {
-    case s.Extern => (Seq(), Seq(), (_, _) => t.Extern)
-    case s.Unchecked => (Seq(), Seq(), (_, _) => t.Unchecked)
-    case s.Derived(id) => (Seq(), Seq(), (_, _) => t.Derived(id))
+  override def deconstruct(f: s.Flag): 
+                          (
+                            Seq[Identifier], Seq[s.Expr], Seq[s.Type], 
+                            (Seq[Identifier], Seq[t.Expr], Seq[t.Type]) => t.Flag
+                          ) = f match {
+    case s.Extern => (Seq(), Seq(), Seq(), (_, _, _) => t.Extern)
+    case s.Unchecked => (Seq(), Seq(), Seq(), (_, _, _) => t.Unchecked)
+    case s.Derived(id) => (Seq(), Seq(), Seq(), (_, _, _) => t.Derived(id))
     case _ => super.deconstruct(f)
   }
 }

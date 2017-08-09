@@ -33,31 +33,17 @@ trait ProgramSimplifier { self =>
             except.contains(vd.id.name))
           None
         else { 
-          // println("removing variable " + vd.id)
-          // println("exceptions: " + except)
           Some(body)
         }
       case _ => None
     }, applyRec=true)(e)
   }
  
-  private def removeUnusedLets(vc: VC): VC = inox.Bench.time("removing unused lets vc", {
-    // println("removing unused lets from vc")
-    // println(vc)
-    // println("exceptions: " + vc.nonRemovable)
+  private def removeUnusedLets(vc: VC): VC = inox.Bench.time("removing unused lets from VCs", {
     transformVC((e: Expr) => removeUnusedLets(e, vc.nonRemovable))(vc)
   })
-  private def removeUnusedLets(fd: FunDef): FunDef = inox.Bench.time("removing unused lets fd", {
-    // println("removing unused lets from: " + fd.id.name)
-    val res = transformFD((e: Expr) => removeUnusedLets(e))(fd)
-    // println(fd)
-    // println("------")
-    // println(res)
-    // println("------")
-    // println("------")
-    // println("------")
-    // println("------")
-    res
+  private def removeUnusedLets(fd: FunDef): FunDef = inox.Bench.time("removing unused lets from fundefs", {
+    transformFD((e: Expr) => removeUnusedLets(e))(fd)
   })
 
   private def removeAssertsAndRequires(e: Expr): Expr = inox.Bench.time("removing asserts and requires", {
@@ -150,11 +136,7 @@ trait ProgramSimplifier { self =>
           val freeVariables = exprOps.variablesOf(fd.fullBody).map(v => v.id)
           fd.params.zipWithIndex.find { case (vd,_) => !freeVariables.contains(vd.id) } match {
             case Some((vd,i)) =>
-              val calls = inox.Bench.time("getting callers", callers(fd).map(_.id))
-              // println("Removing %s,%s of %s".format(vd.id.name, i, id.name))
-              // println(fd)
-              // println(fd.flags)
-              // println("The callers are: %s".format(calls))
+              val calls = callers(fd).map(_.id)
 
               val funs3 = calls.foldLeft(funs2) { case (funDefs, id2) =>
                 val fd2 = funs2(id2)
@@ -188,7 +170,7 @@ object ProgramSimplifier {
     object simplifier extends ProgramSimplifier {
       override val program = p
     }
-    val (syms2, vcs2) = inox.Bench.time("simplifier", simplifier.transform(p.symbols, vcs))
+    val (syms2, vcs2) = inox.Bench.time("program simplifier", simplifier.transform(p.symbols, vcs))
     val p2 = new inox.Program {
       val trees = p.trees
       val symbols = syms2

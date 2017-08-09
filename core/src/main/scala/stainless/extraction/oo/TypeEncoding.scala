@@ -10,6 +10,8 @@ import scala.collection.mutable.{Map => MutableMap}
 trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
   val s: Trees
   val t: holes.Trees
+  
+  override val name = Some("Type Encoding")
 
   def transform(symbols: s.Symbols): t.Symbols = {
     import t.{forall => _, _}
@@ -224,7 +226,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
       def apply(pairs: Traversable[(s.TypeParameter, t.Expr)]): TypeScope = new TypeScope(pairs.toMap)
     }
 
-    def encodeType(tpe: s.Type)(implicit scope: TypeScope): t.Expr = inox.Bench.time("encodeType", tpe match {
+    def encodeType(tpe: s.Type)(implicit scope: TypeScope): t.Expr = tpe match {
       case s.AnyType => top()
       case s.NothingType => bot()
       case s.ClassType(id, tps) => cls(IntegerLiteral(id.globalId), mkSeq(tps map encodeType))
@@ -245,7 +247,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
       case s.RealType => real()
       case s.StringType => str()
       case _ => scala.sys.error("Unexpected type " + tpe)
-    })
+    }
 
     val subtypeID = FreshIdentifier("isSubtypeOf")
     val subtypeOf = (e1: Expr, e2: Expr) => FunctionInvocation(subtypeID, Seq(), Seq(e1, e2))
@@ -723,7 +725,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
 
       def rewrite(id: Identifier): Boolean = functions(id).rewrite
 
-      private def isSimpleFunction(fun: s.FunAbstraction): Boolean = inox.Bench.time("isSimpleFunction", {
+      private def isSimpleFunction(fun: s.FunAbstraction): Boolean = inox.Bench.time("call to isSimpleFunction", {
         import symbols._
 
         var simple: Boolean = true
@@ -777,7 +779,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         simple
       })
 
-      def withFunctions(funs: Seq[s.FunAbstraction]): Scope = inox.Bench.time("withFunctions", {
+      def withFunctions(funs: Seq[s.FunAbstraction]): Scope = {
         val funMap = funs.map(fun => fun.id -> fun).toMap
 
         var newGraph = graph
@@ -807,7 +809,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         })
 
         new Scope(newFunctions, tparams, newGraph)
-      })
+      }
 
       def in(id: Identifier): Scope = {
         val RewriteInfo(fun, _, vds) = functions(id)
@@ -815,7 +817,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         new Scope(functions, newTparams, graph)
       }
 
-      override def transform(e: s.Expr): t.Expr = inox.Bench.time("trtransform", e match {
+      override def transform(e: s.Expr): t.Expr = e match {
         case s.ClassConstructor(ct, args) =>
           val fd = classConstructors(ct.id)
           t.FunctionInvocation(fd.id, Seq(), ct.tps.map(encodeType) ++ args.map(transform))
@@ -910,9 +912,9 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
           ).copiedFrom(e)
 
         case _ => super.transform(e)
-      })
+      }
 
-      private def transformPattern(scrut: s.Expr, pattern: s.Pattern): (t.Pattern, Option[t.Expr]) = inox.Bench.time("trPattern", {
+      private def transformPattern(scrut: s.Expr, pattern: s.Pattern): (t.Pattern, Option[t.Expr]) = {
         import symbols.{transform => _, _}
 
         def typePattern(tp: s.Type, variance: Option[Boolean]): (t.Pattern, t.Expr) = {
@@ -995,7 +997,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
           case t.BooleanLiteral(true) => None
           case _ => Some(cond)
         })
-      })
+      }
     }
 
     object Scope {
@@ -1006,7 +1008,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
       )
     }
 
-    def transformFunction(fd: s.FunAbstraction)(implicit scope: Scope): t.FunAbstraction = inox.Bench.time("trFunction", {
+    def transformFunction(fd: s.FunAbstraction)(implicit scope: Scope): t.FunAbstraction = {
       import s.TypeParameterWithBounds
       val scope0 = scope
 
@@ -1077,7 +1079,7 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
           fd.flags map scope.transform
         )
       }
-    })
+    }
 
     val symbolFuns = symbols.functions.values.map(s.Outer(_)).toSeq
     val baseScope = Scope.empty withFunctions symbolFuns
@@ -1103,9 +1105,9 @@ trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
         objCons
       ) ++ adts)
 
-    val finalSymbols = inox.Bench.time("finalSymbols", NoSymbols
+    val finalSymbols = NoSymbols
       .withFunctions(newSymbols.functions.values.toSeq)
-      .withADTs(newSymbols.adts.values.toSeq))
+      .withADTs(newSymbols.adts.values.toSeq)
 
     for (fd <- finalSymbols.functions.values) {
       if (!finalSymbols.isSubtypeOf(fd.fullBody.getType(finalSymbols), fd.returnType)) {

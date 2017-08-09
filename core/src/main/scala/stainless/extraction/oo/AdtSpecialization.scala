@@ -9,6 +9,8 @@ import scala.collection.mutable.{Map => MutableMap}
 trait AdtSpecialization extends inox.ast.SymbolTransformer { self =>
   val s: Trees
   val t: Trees
+  
+  override val name = Some("ADT Specialization")
 
   def transform(symbols: s.Symbols): t.Symbols = {
     import s._

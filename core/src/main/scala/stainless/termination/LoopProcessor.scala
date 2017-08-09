@@ -23,6 +23,8 @@ trait LoopProcessor extends OrderingProcessor {
   object withoutPosts extends inox.ast.SimpleSymbolTransformer {
     val s: program.trees.type = program.trees
     val t: program.trees.type = program.trees
+  
+    override val name = Some("Without Posts")
 
     protected def transformFunction(fd: FunDef): FunDef =
       fd.copy(fullBody = exprOps.withPostcondition(fd.fullBody, None))
