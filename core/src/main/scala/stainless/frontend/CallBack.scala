@@ -149,7 +149,7 @@ trait CallBackWithRegistry extends CallBack { self =>
     }
 
     try {
-      syms.ensureWellFormed
+      inox.Bench.time("call to ensureWellFormed", syms.ensureWellFormed)
     } catch {
       case e: syms.TypeErrorException =>
         ctx.reporter.error(e.pos, e.getMessage)

@@ -118,7 +118,9 @@ object VerificationComponent extends SimpleComponent {
       }
     }
 
-    val vcs1 = VerificationGenerator.gen(encoder.targetProgram)(funs)
+    val vcs1 = inox.Bench.time("VerificationGenerator.gen", 
+      VerificationGenerator.gen(encoder.targetProgram)(funs)
+    )
 
     val simplify = p.ctx.options.findOptionOrDefault(optSimplify)
     val (simpleProgram, vcs2) =
@@ -127,7 +129,7 @@ object VerificationComponent extends SimpleComponent {
       else
         (encoder.targetProgram, vcs1)
 
-    VerificationChecker.verify(simpleProgram)(vcs2).mapValues {
+    inox.Bench.time("VerificationChecker.verify", VerificationChecker.verify(simpleProgram)(vcs2)).mapValues {
       case VCResult(VCStatus.Invalid(model), s, t) =>
         val originalModel = changeModelProgram(model)(encoder.targetProgram)
         VCResult(VCStatus.Invalid(originalModel.encode(encoder.reverse)), s, t)

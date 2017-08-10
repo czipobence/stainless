@@ -120,6 +120,7 @@ trait VerificationCache extends VerificationChecker { self =>
 object VerificationCache {
   val cacheFile = "vccache.bin"
   var vccache = scala.collection.concurrent.TrieMap[String,Unit]()
+  println("loading persistent cache")
   inox.Bench.time("loading persistent cache", VerificationCache.loadPersistentCache())
     
   def contains(tt: inox.ast.Trees)(p: (tt.Symbols, tt.Expr)) = {
