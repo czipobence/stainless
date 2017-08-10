@@ -16,10 +16,9 @@ trait Canonization { selfcanonize =>
   type VC = verification.VC[trees.type]
 
   def transform(syms: s.Symbols, vc: VC): (t.Symbols, Expr) = {
-    // println("LET ME TRANSFORM PLEASE")
-    // println(syms)
 
     var localCounter = 0
+    // Maps an original identifier to a normalized identifier
     var renaming: Map[Identifier,Identifier] = Map()
 
     def addRenaming(id: Identifier): Unit = {
@@ -63,26 +62,7 @@ trait Canonization { selfcanonize =>
           exploreFunDef(fd.id)
           transformFunDef(fd)
         }
-      adt match {
-        case sort: s.ADTSort => new t.ADTSort(
-          idTransformer.transform(sort.id),
-          sort.tparams map idTransformer.transform,
-          sort.cons map idTransformer.transform,
-          sort.flags map idTransformer.transform
-        ) {
-          override def invariant(implicit syms: Symbols) = newInvariant
-        }.copiedFrom(adt)
-
-        case cons: s.ADTConstructor => new t.ADTConstructor(
-          idTransformer.transform(cons.id),
-          cons.tparams map idTransformer.transform,
-          cons.sort map idTransformer.transform,
-          cons.fields map idTransformer.transform,
-          cons.flags map idTransformer.transform
-        ) {
-          override def invariant(implicit syms: Symbols) = newInvariant
-        }.copiedFrom(adt)
-      }
+      idTransformer.transform(adt)
     }
 
     def exploreADT(id: Identifier): Unit = {
@@ -108,16 +88,14 @@ trait Canonization { selfcanonize =>
 
     val newVCBody = idTransformer.transform(vc.condition)
 
-    /** Should be changed so that functions are traversed in the order they
-      * appear in `vc.condition`
-      */
-
     val newFundefs = syms.functions.values.map { fd => 
-      exploreFunDef(fd.id)
+      // explore again in case this FunDef was not explored during the transformation of vc
+      exploreFunDef(fd.id)         
       transformedFunctions(fd.id)
     }
 
     val newADTs = syms.adts.values.map { adt =>
+      // explore again in case this ADT was not explored during the transformation of vc
       exploreADT(adt.id)
       transformedADTs(adt.id)
     }
