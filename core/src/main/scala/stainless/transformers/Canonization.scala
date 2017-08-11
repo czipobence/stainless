@@ -62,7 +62,7 @@ trait Canonization { selfcanonize =>
           exploreFunDef(fd.id)
           transformFunDef(fd)
         }
-      idTransformer.transform(adt)
+      idTransformer.transform(adt).changeInvariant(newInvariant)
     }
 
     def exploreADT(id: Identifier): Unit = {
