@@ -5,13 +5,13 @@ package transformers
 
 import stainless.extraction.inlining.Trees
 
-trait Canonization { selfcanonize =>
+trait Canonization { self =>
 
   val trees: stainless.ast.Trees
-  lazy val s: selfcanonize.trees.type = selfcanonize.trees
-  lazy val t: selfcanonize.trees.type = selfcanonize.trees
+  lazy val s: self.trees.type = self.trees
+  lazy val t: self.trees.type = self.trees
 
-  import selfcanonize.trees._
+  import self.trees._
 
   type VC = verification.VC[trees.type]
 
@@ -29,54 +29,39 @@ trait Canonization { selfcanonize =>
       }
     }
 
-    var traversed = Set[Identifier]()
-
     // Map from old identifiers to new fundefs
     var transformedFunctions = Map[Identifier, FunDef]()
     // Map from old identifiers to new ADTs
     var transformedADTs = Map[Identifier, ADTDefinition]()
 
-    def transformFunDef(fd: FunDef): FunDef = {
-      new FunDef(
-        idTransformer.transform(fd.id),
-        fd.tparams map idTransformer.transform,
-        fd.params.map(idTransformer.transform),
-        idTransformer.transform(fd.returnType),
-        idTransformer.transform(fd.fullBody),
-        fd.flags
-      ).copiedFrom(fd)
-    }
-
-    def exploreFunDef(id: Identifier): Unit = {
-      if (syms.functions.contains(id) && !traversed(id)) {
-        traversed += id
-        val fd = syms.functions(id)
-        val newFD = transformFunDef(fd)
-        transformedFunctions += ((id, newFD))
-      }
-    }
-
-    def transformADT(adt: ADTDefinition): ADTDefinition = {
-      val newInvariant =  
-        adt.invariant(syms).map { fd =>
-          exploreFunDef(fd.id)
-          transformFunDef(fd)
-        }
-      idTransformer.transform(adt).changeInvariant(newInvariant)
-    }
-
-    def exploreADT(id: Identifier): Unit = {
-      if (syms.adts.contains(id) && !traversed(id)) {
-        traversed += id
-        val adt = syms.adts(id)
-        val newADT = transformADT(adt)
-        transformedADTs += ((id, newADT))
-      }
-    }
-
     object idTransformer extends inox.ast.TreeTransformer {
-      val s: selfcanonize.trees.type = selfcanonize.trees
-      val t: selfcanonize.trees.type = selfcanonize.trees
+      val s: self.trees.type = self.trees
+      val t: self.trees.type = self.trees
+
+      var traversed = Set[Identifier]()
+
+      def exploreFunDef(id: Identifier): Unit = {
+        if (syms.functions.contains(id) && !traversed(id)) {
+          traversed += id
+          val fd = syms.functions(id)
+          val newFD = transform(fd)
+          transformedFunctions += ((id, newFD))
+        }
+      }
+
+      def transformADT(adt: ADTDefinition): ADTDefinition = {
+        val newInvariant = adt.invariant(syms) map transform
+        transform(adt).changeInvariant(newInvariant)
+      }
+
+      def exploreADT(id: Identifier): Unit = {
+        if (syms.adts.contains(id) && !traversed(id)) {
+          traversed += id
+          val adt = syms.adts(id)
+          val newADT = transformADT(adt)
+          transformedADTs += ((id, newADT))
+        }
+      }
 
       override def transform(id: Identifier): Identifier = {
         addRenaming(id)
@@ -90,13 +75,13 @@ trait Canonization { selfcanonize =>
 
     val newFundefs = syms.functions.values.map { fd => 
       // explore again in case this FunDef was not explored during the transformation of vc
-      exploreFunDef(fd.id)         
+      idTransformer.exploreFunDef(fd.id)         
       transformedFunctions(fd.id)
     }
 
     val newADTs = syms.adts.values.map { adt =>
       // explore again in case this ADT was not explored during the transformation of vc
-      exploreADT(adt.id)
+      idTransformer.exploreADT(adt.id)
       transformedADTs(adt.id)
     }
     val newSyms = NoSymbols.withFunctions(newFundefs.toSeq).withADTs(newADTs.toSeq)
@@ -107,9 +92,9 @@ trait Canonization { selfcanonize =>
 
 
 object Canonization {
-  def canonize(thetrees: stainless.ast.Trees)
-              (p: inox.Program { val trees: thetrees.type }, vc: verification.VC[thetrees.type]): 
-                (p.trees.Symbols, thetrees.Expr)  = {
+  def canonize(trs: stainless.ast.Trees)
+              (p: inox.Program { val trees: trs.type }, vc: verification.VC[trs.type]): 
+                (p.trees.Symbols, trs.Expr)  = {
     object canonizer extends Canonization {
       override val trees: p.trees.type = p.trees
     }

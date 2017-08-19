@@ -37,43 +37,24 @@ trait VerificationCache extends VerificationChecker { self =>
 
   def buildDependencies(vc: VC): SubProgram = {
 
-    var adts = Set[(Identifier,ADTDefinition)]()
+    var adts = Set[ADTDefinition]()
     var fundefs = Set[FunDef]()
-    var traversedExpr = Set[Expr]()
-    var traversedTypes = Set[Type]()
+    var traversed = Set[Identifier]()
 
     val traverser = new TreeTraverser {
-      override def traverse(e: Expr): Unit = {
-        if (!traversedExpr.contains(e)) {
-          traversedExpr += e
-          val callees = inox.Bench.time("getting transitive callees", {
-            exprOps.functionCallsOf(e).flatMap(fi => transitiveCallees(fi.tfd.fd) + fi.tfd.fd)
-          })
-          fundefs = fundefs ++ callees
-          super.traverse(e)
-        }
-      }
-      override def traverse(tpe: Type): Unit = {
-        if (!traversedTypes.contains(tpe)) {
-          traversedTypes += tpe
-          tpe match {
-            case adt: ADTType =>
-              val id = adt.id
-              val a = getADT(adt.id)
-              a.invariant.map(inv => {
-                fundefs += inv
-                traverse(inv.fullBody)
-              })
-              adts += ((id,a))
-              // FIXME: what about invariants for the constructors of the sort?
-              a match {
-                case sort: ADTSort => 
-                  adts ++= (sort.cons.map(consId => (consId, getADT(consId))))
-                case _ => ()
-              }
-            case _ => ()
+      override def traverse(id: Identifier): Unit = {
+        if (!traversed.contains(id)) {
+          traversed += id
+          if (program.symbols.functions.contains(id)) {
+            val fd = program.symbols.functions(id)
+            fundefs += fd
+            traverse(fd)
           }
-          super.traverse(tpe)
+          else if (program.symbols.adts.contains(id)) {
+            val adtdef = program.symbols.adts(id)
+            adts += adtdef
+            traverse(adtdef)
+          }
         }
       }
     }
@@ -82,7 +63,7 @@ trait VerificationCache extends VerificationChecker { self =>
 
     new inox.Program {
       val trees: program.trees.type = program.trees
-      val symbols = NoSymbols.withFunctions(fundefs.toSeq).withADTs(adts.map(_._2).toSeq)
+      val symbols = NoSymbols.withFunctions(fundefs.toSeq).withADTs(adts.toSeq)
       val ctx = program.ctx
     }
   }
@@ -91,7 +72,12 @@ trait VerificationCache extends VerificationChecker { self =>
     import VerificationCache._
 
     inox.Bench.time("checking VC with cache", {
+      ctx.reporter.debug("BUILDING DEPENDENCIES")(DebugSectionCache)
       val sp: SubProgram = inox.Bench.time("building dependencies", buildDependencies(vc))
+      ctx.reporter.synchronized {
+        ctx.reporter.debug(sp.symbols.asString(uniq))(DebugSectionCache)
+        ctx.reporter.debug(vc.condition.asString(uniq))(DebugSectionCache)
+      }
       val canonic = inox.Bench.time("canonizing", transformers.Canonization.canonize(sp.trees)(sp, vc))
       if (VerificationCache.contains(sp.trees)(canonic)) {
         ctx.reporter.synchronized {
