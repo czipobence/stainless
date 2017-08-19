@@ -106,7 +106,6 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
       }
 
       (
-        Seq(),
         recCases.flatMap(_._2),
         recCases.flatMap(_._3),
         scrut +: recCases.flatMap(_._4),

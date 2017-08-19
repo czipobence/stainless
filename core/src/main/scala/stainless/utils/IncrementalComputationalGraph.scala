@@ -29,13 +29,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
    * all the [[deps]] -- and the indirect dependencies -- are present in the graph.
    */
   def update(id: Id, in: Input, deps: Set[Id], compute: Boolean): Option[Result] = {
-<<<<<<< HEAD
-    inox.Bench.time("updating ICG",
-      update(Node(id, in, deps, compute))
-    )
-=======
     update(Node(id, in, deps, compute))
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
   }
 
   /**
@@ -43,17 +37,10 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
    *
    * Throw an [[java.lang.IllegalArgumentException]] if the node wasn't in the graph.
    */
-<<<<<<< HEAD
-  def remove(id: Id): Unit = inox.Bench.time("Removing node from ICG", nodes get id match {
-    case Some(n) => remove(n)
-    case None => throw new java.lang.IllegalArgumentException(s"Node $id is not part of the graph")
-  })
-=======
   def remove(id: Id): Unit = nodes get id match {
     case Some(n) => remove(n)
     case None => throw new java.lang.IllegalArgumentException(s"Node $id is not part of the graph")
   }
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
 
   /** Put on hold any computation. */
   def freeze(): Unit = {
@@ -63,11 +50,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
   /** Resume computation. */
   def unfreeze(): Option[Result] = {
     frozen = false
-<<<<<<< HEAD
-    inox.Bench.time("Call to process", process())
-=======
     process()
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
   }
 
 
@@ -153,11 +136,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
    * Insert a new node & update the graph,
    * placing any node that depends on [[n]] into [[toCompute]]
    */
-<<<<<<< HEAD
-  private def insert(n: Node): Unit = inox.Bench.time("Body of insert", {
-=======
   private def insert(n: Node): Unit = {
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
     nodes += n.id -> n
     if (n.compute) toCompute += n
     n.deps foreach { depId =>
@@ -165,11 +144,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
     }
 
     mark(n)
-<<<<<<< HEAD
-  })
-=======
   }
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
 
   /** Remove an existing node from the graph. */
   private def remove(n: Node): Unit = {
@@ -179,11 +154,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
   }
 
   /** Recursively put the nodes that depends on [[n]] into [[toCompute]]. */
-<<<<<<< HEAD
-  private def mark(n: Node): Unit = inox.Bench.time("Body of mark", {
-=======
   private def mark(n: Node): Unit = {
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
     val seen = MutableSet[Node]()
     val queue = MutableQueue[Node]()
 
@@ -209,11 +180,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
       val head = queue.dequeue
       visit(head)
     }
-<<<<<<< HEAD
-  })
-=======
   }
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
 
   /** Determine the set of nodes that can be computed, and compute them. */
   private def process(): Option[Result] = {
@@ -239,11 +206,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
    * Compute the set of (indirect or not) dependencies,
    * or return None if any dependency is missing from the graph.
    */
-<<<<<<< HEAD
-  private def dependencies(n: Node): Option[Set[Node]] = inox.Bench.time("Body of dependencies", {
-=======
   private def dependencies(n: Node): Option[Set[Node]] = {
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
     val seen = MutableSet[Node]()
     val deps = MutableSet[Node]()
     val queue = MutableQueue[Node]()
@@ -273,11 +236,7 @@ trait IncrementalComputationalGraph[Id, Input, Result] {
 
     if (complete) Some(deps.toSet)
     else None
-<<<<<<< HEAD
-  })
-=======
   }
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
 
 }
 

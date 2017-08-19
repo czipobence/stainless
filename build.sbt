@@ -8,7 +8,7 @@ val isMac     = osInf.indexOf("Mac") >= 0
 val osName = if (isWindows) "win" else if (isMac) "mac" else "unix"
 val osArch = System.getProperty("sun.arch.data.model")
 
-val inoxVersion = "1.0.2-161-g082081b"
+//val inoxVersion = "1.0.2-161-g082081b"
 val dottyVersion = "0.1.1-bin-20170429-10a2ce6-NIGHTLY"
 
 lazy val nParallel = {
@@ -67,8 +67,8 @@ lazy val commonSettings: Seq[Setting[_]] = artifactSettings ++ Seq(
   ),
 
   libraryDependencies ++= Seq(
-    "ch.epfl.lara" %% "inox" % inoxVersion,
-    "ch.epfl.lara" %% "inox" % inoxVersion % "test" classifier "tests",
+   // "ch.epfl.lara" %% "inox" % inoxVersion,
+   // "ch.epfl.lara" %% "inox" % inoxVersion % "test" classifier "tests",
     "ch.epfl.lara" %% "cafebabe" % "1.2",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
     "org.json4s" %% "json4s-native" % "3.5.2"
@@ -201,7 +201,7 @@ lazy val IntegrationTest = config("it") extend(Test)
 lazy val `stainless-core` = (project in file("core"))
   .settings(name := "stainless-core")
   .settings(commonSettings)
-  //.dependsOn(inox % "compile->compile;test->test")
+  .dependsOn(inox % "compile->compile;test->test")
 
 lazy val `stainless-scalac` = (project in file("frontends/scalac"))
   .settings(

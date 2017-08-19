@@ -164,10 +164,7 @@ private class CanonicalFormBuilderImpl {
     }
 
     // Use the deconstructor to extract **most** of the expression's information.
-<<<<<<< HEAD
     // FIXME: store ids as well?
-=======
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
     val (ids, vars, es, tps, _) = xt.deconstructor.deconstruct(e)
 
     // Format is:
@@ -216,11 +213,7 @@ private class CanonicalFormBuilderImpl {
 
     case xt.MatchExpr(_, cases) =>
       def rec(p: xt.Pattern): Unit = {
-<<<<<<< HEAD
-        val (vs, _, _, subs, _) = xt.deconstructor.deconstruct(p)
-=======
         val (_, vs, _, _, subs, _) = xt.deconstructor.deconstruct(p)
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
         vs map { _.toVal } foreach registerVD
         subs foreach rec
       }

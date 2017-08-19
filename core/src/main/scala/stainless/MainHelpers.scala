@@ -69,8 +69,7 @@ trait MainHelpers extends inox.MainHelpers {
     verification.DebugSectionCacheMiss,
     termination.DebugSectionTermination,
     DebugSectionExtraction,
-    frontend.DebugSectionFrontend,
-    inox.Bench.DebugSectionBench
+    frontend.DebugSectionFrontend
   )
 
   override protected def displayVersion(reporter: inox.Reporter): Unit = {

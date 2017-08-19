@@ -57,7 +57,6 @@ object VerificationComponent extends SimpleComponent {
     override val name = VerificationComponent.this.name
 
     override val width = 6
-<<<<<<< HEAD
 
     override def emitRowsAndStats: Option[(Seq[Row], ReportStats)] = if (totalConditions == 0) None else Some((
       vrs.map { case (vc, vr) =>
@@ -73,23 +72,6 @@ object VerificationComponent extends SimpleComponent {
       ReportStats(totalConditions, totalTime, totalValid, totalInvalid, totalUnknown)
     ))
 
-=======
-
-    override def emitRowsAndStats: Option[(Seq[Row], ReportStats)] = if (totalConditions == 0) None else Some((
-      vrs.map { case (vc, vr) =>
-        Row(Seq(
-          Cell(vc.fd),
-          Cell(vc.kind.name),
-          Cell(vc.getPos),
-          Cell(vr.status),
-          Cell(vr.solver.map(_.name).getOrElse("")),
-          Cell(vr.time.map(t => f"${t / 1000d}%3.3f").getOrElse(""))
-        ))
-      },
-      ReportStats(totalConditions, totalTime, totalValid, totalInvalid, totalUnknown)
-    ))
-
->>>>>>> 3f0486c954716b40383b7e9c337f42870ebbf79b
     override def emitJson: JArray = {
       def status2Json(status: VCStatus[Model]): JObject = status match {
         case Invalid(cex) =>
