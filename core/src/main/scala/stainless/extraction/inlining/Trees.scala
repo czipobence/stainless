@@ -32,11 +32,7 @@ trait TreeDeconstructor extends extraction.TreeDeconstructor {
   protected val s: Trees
   protected val t: Trees
 
-  override def deconstruct(f: s.Flag): 
-                          (
-                            Seq[Identifier], Seq[s.Expr], Seq[s.Type], 
-                            (Seq[Identifier], Seq[t.Expr], Seq[t.Type]) => t.Flag
-                          ) = f match {
+  override def deconstruct(f: s.Flag): DeconstructedFlag = f match {
     case s.Inline => (Seq(), Seq(), Seq(), (_, _, _) => t.Inline)
     case s.Implicit => (Seq(), Seq(), Seq(), (_, _, _) => t.Implicit)
     case _ => super.deconstruct(f)

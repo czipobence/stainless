@@ -7,38 +7,40 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
   protected val s: Trees
   protected val t: Trees
 
-  def deconstruct(pattern: s.Pattern): (Seq[s.Variable], Seq[s.Expr], Seq[s.Type], Seq[s.Pattern], (Seq[t.Variable], Seq[t.Expr], Seq[t.Type], Seq[t.Pattern]) => t.Pattern) = pattern match {
+  /** Rebuild a pattern from the given set of identifiers, variables, expressions, types and subpatterns */
+  protected type PatternBuilder = (Seq[Identifier], Seq[t.Variable], Seq[t.Expr], Seq[t.Type], Seq[t.Pattern]) => t.Pattern
+
+  /** Extracted subtrees from a pattern as well as a "builder" */
+  protected type DeconstructedPattern = (Seq[Identifier], Seq[s.Variable], Seq[s.Expr], Seq[s.Type], Seq[s.Pattern], PatternBuilder)
+
+  def deconstruct(pattern: s.Pattern): DeconstructedPattern = pattern match {
     case s.InstanceOfPattern(binder, ct) =>
-      (binder.map(_.toVariable).toSeq, Seq(), Seq(ct), Seq(), (vs, _, tps, _) => {
+      (Seq(), binder.map(_.toVariable).toSeq, Seq(), Seq(ct), Seq(), (_, vs, _, tps, _) => {
         t.InstanceOfPattern(vs.headOption.map(_.toVal), tps.head)
       })
     case s.WildcardPattern(binder) =>
-      (binder.map(_.toVariable).toSeq, Seq(), Seq(), Seq(), (vs, _, _, _) => {
+      (Seq(), binder.map(_.toVariable).toSeq, Seq(), Seq(), Seq(), (_, vs, _, _, _) => {
         t.WildcardPattern(vs.headOption.map(_.toVal))
       })
     case s.ADTPattern(binder, ct, subs) =>
-      (binder.map(_.toVariable).toSeq, Seq(), Seq(ct), subs, (vs, _, tps, pats) => {
+      (Seq(), binder.map(_.toVariable).toSeq, Seq(), Seq(ct), subs, (_, vs, _, tps, pats) => {
         t.ADTPattern(vs.headOption.map(_.toVal), tps.head.asInstanceOf[t.ADTType], pats)
       })
     case s.TuplePattern(binder, subs) =>
-      (binder.map(_.toVariable).toSeq, Seq(), Seq(), subs, (vs, _, _, pats) => {
+      (Seq(), binder.map(_.toVariable).toSeq, Seq(), Seq(), subs, (_, vs, _, _, pats) => {
         t.TuplePattern(vs.headOption.map(_.toVal), pats)
       })
     case s.LiteralPattern(binder, lit) =>
-      (binder.map(_.toVariable).toSeq, Seq(lit), Seq(), Seq(), (vs, es, _, _) => {
+      (Seq(), binder.map(_.toVariable).toSeq, Seq(lit), Seq(), Seq(), (_, vs, es, _, _) => {
         t.LiteralPattern(vs.headOption.map(_.toVal), es.head.asInstanceOf[t.Literal[_]])
       })
     case s.UnapplyPattern(binder, id, tps, subs) =>
-      (binder.map(_.toVariable).toSeq, Seq(), tps, subs, (vs, _, tps, pats) => {
-        t.UnapplyPattern(vs.headOption.map(_.toVal), id, tps, pats)
+      (Seq(id), binder.map(_.toVariable).toSeq, Seq(), tps, subs, (ids, vs, _, tps, pats) => {
+        t.UnapplyPattern(vs.headOption.map(_.toVal), ids.head, tps, pats)
       })
   }
 
-  override def deconstruct(expr: s.Expr): 
-                          (
-                            Seq[Identifier], Seq[s.Variable], Seq[s.Expr], Seq[s.Type], 
-                            (Seq[Identifier], Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Expr
-                          ) = expr match {
+  override def deconstruct(expr: s.Expr): DeconstructedExpr = expr match {
     case s.NoTree(tpe) =>
       (Seq(), Seq(), Seq(), Seq(tpe), (_, _, _, tps) => t.NoTree(tps.head))
     case s.Error(tpe, desc) =>
@@ -56,19 +58,70 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
 
     case s.MatchExpr(scrut, cases) =>
 
-      def rec(p: s.Pattern): (Seq[s.Variable], Seq[s.Expr], Seq[s.Type], (Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Pattern) = {
-        val (vs, es, tps, pats, recons) = deconstruct(p)
-
+      def rec(p: s.Pattern): (
+        Seq[Identifier], Seq[s.Variable], Seq[s.Expr], Seq[s.Type],
+        (Seq[Identifier], Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Pattern
+      ) = {
+        val (ids, vs, es, tps, pats, recons) = deconstruct(p)
         val prec = pats.map(pat => rec(pat))
-        (vs ++ prec.flatMap(_._1), es ++ prec.flatMap(_._2), tps ++ prec.flatMap(_._3), (nvs, nes, ntps) => {
-          val (outerVs, innerVs) = nvs.splitAt(vs.size)
-          val (outerEs, innerEs) = nes.splitAt(es.size)
-          val (outerTps, innerTps) = ntps.splitAt(tps.size)
+        (
+          ids ++ prec.flatMap(_._1),
+          vs ++ prec.flatMap(_._2),
+          es ++ prec.flatMap(_._3),
+          tps ++ prec.flatMap(_._4),
+          (nids, nvs, nes, ntps) => {
+            val (outerIds, innerIds) = nids.splitAt(ids.size)
+            val (outerVs, innerVs) = nvs.splitAt(vs.size)
+            val (outerEs, innerEs) = nes.splitAt(es.size)
+            val (outerTps, innerTps) = ntps.splitAt(tps.size)
 
-          var rvs = innerVs
-          var res = innerEs
-          var rtps = innerTps
-          val newPats = for ((vs, es, tps, recons) <- prec) yield {
+            var rids = innerIds
+            var rvs = innerVs
+            var res = innerEs
+            var rtps = innerTps
+            val newPats = for ((ids, vs, es, tps, recons) <- prec) yield {
+              val (currIds, nextIds) = ids.splitAt(ids.size)
+              rids = nextIds
+
+              val (currVs, nextVs) = rvs.splitAt(vs.size)
+              rvs = nextVs
+
+              val (currEs, nextEs) = res.splitAt(es.size)
+              res = nextEs
+
+              val (currTps, nextTps) = rtps.splitAt(tps.size)
+              rtps = nextTps
+
+              recons(currIds, currVs, currEs, currTps)
+            }
+
+            recons(outerIds, outerVs, outerEs, outerTps, newPats)
+          }
+        )
+      }
+
+      val recCases = for (caze <- cases) yield {
+        val (pids, pvs, pes, ptps, precons) = rec(caze.pattern)
+        (caze.optGuard.isDefined, pids, pvs, caze.optGuard.toSeq ++ (caze.rhs +: pes), ptps, precons)
+      }
+
+      (
+        Seq(),
+        recCases.flatMap(_._2),
+        recCases.flatMap(_._3),
+        scrut +: recCases.flatMap(_._4),
+        recCases.flatMap(_._5),
+        (ids, vs, es, tps) => {
+          val newScrut +: patEs = es
+
+          var rids = ids
+          var rvs = vs
+          var res = patEs
+          var rtps = tps
+          t.MatchExpr(newScrut, for ((hasGuard, ids, vs, es, tps, recons) <- recCases) yield {
+            var (currIds, nextIds) = rids.splitAt(ids.size)
+            rids = nextIds
+
             val (currVs, nextVs) = rvs.splitAt(vs.size)
             rvs = nextVs
 
@@ -78,43 +131,16 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
             val (currTps, nextTps) = rtps.splitAt(tps.size)
             rtps = nextTps
 
-            recons(currVs, currEs, currTps)
-          }
-
-          recons(outerVs, outerEs, outerTps, newPats)
-        })
-      }
-
-      val recCases = for (caze <- cases) yield {
-        val (pvs, pes, ptps, precons) = rec(caze.pattern)
-        (caze.optGuard.isDefined, pvs, caze.optGuard.toSeq ++ (caze.rhs +: pes), ptps, precons)
-      }
-
-      (Seq(), recCases.flatMap(_._2), scrut +: recCases.flatMap(_._3), recCases.flatMap(_._4), (_, vs, es, tps) => {
-        val newScrut +: patEs = es
-
-        var rvs = vs
-        var res = patEs
-        var rtps = tps
-        t.MatchExpr(newScrut, for ((hasGuard, vs, es, tps, recons) <- recCases) yield {
-          val (currVs, nextVs) = rvs.splitAt(vs.size)
-          rvs = nextVs
-
-          val (currEs, nextEs) = res.splitAt(es.size)
-          res = nextEs
-
-          val (currTps, nextTps) = rtps.splitAt(tps.size)
-          rtps = nextTps
-
-          if (hasGuard) {
-            val guard +: rhs +: pes = currEs
-            t.MatchCase(recons(currVs, pes, currTps), Some(guard), rhs)
-          } else {
-            val rhs +: pes = currEs
-            t.MatchCase(recons(currVs, pes, currTps), None, rhs)
-          }
-        })
-      })
+            if (hasGuard) {
+              val guard +: rhs +: pes = currEs
+              t.MatchCase(recons(currIds, currVs, pes, currTps), Some(guard), rhs)
+            } else {
+              val rhs +: pes = currEs
+              t.MatchCase(recons(currIds, currVs, pes, currTps), None, rhs)
+            }
+          })
+        }
+      )
 
     case s.FiniteArray(elems, base) =>
       (Seq(), Seq(), elems, Seq(base), (_, _, es, tps) => t.FiniteArray(es, tps.head))
@@ -137,19 +163,15 @@ trait TreeDeconstructor extends inox.ast.TreeDeconstructor {
     case _ => super.deconstruct(expr)
   }
 
-  override def deconstruct(tpe: s.Type): (Seq[Identifier], Seq[s.Type], Seq[s.Flag], (Seq[Identifier], Seq[t.Type], Seq[t.Flag]) => t.Type) = tpe match {
+  override def deconstruct(tpe: s.Type): DeconstructedType = tpe match {
     case s.ArrayType(base) => (Seq(), Seq(base), Seq(), (_, tps, _) => t.ArrayType(tps(0)))
     case _ => super.deconstruct(tpe)
   }
 
-  override def deconstruct(f: s.Flag): 
-                          (
-                            Seq[Identifier], Seq[s.Expr], Seq[s.Type], 
-                            (Seq[Identifier], Seq[t.Expr], Seq[t.Type]) => t.Flag
-                          ) = f match {
+  override def deconstruct(f: s.Flag): DeconstructedFlag = f match {
     case s.Extern => (Seq(), Seq(), Seq(), (_, _, _) => t.Extern)
     case s.Unchecked => (Seq(), Seq(), Seq(), (_, _, _) => t.Unchecked)
-    case s.Derived(id) => (Seq(), Seq(), Seq(), (_, _, _) => t.Derived(id))
+    case s.Derived(id) => (Seq(id), Seq(), Seq(), (ids, _, _) => t.Derived(ids.head))
     case _ => super.deconstruct(f)
   }
 }
@@ -177,8 +199,8 @@ trait Extractors extends inox.ast.Extractors { self: Trees =>
     type Target = Pattern
 
     def unapply(pat: Pattern): Option[(Seq[Pattern], Seq[Pattern] => Pattern)] = {
-      val (vs, es, tps, pats, builder) = deconstructor.deconstruct(pat)
-      Some(pats, patss => builder(vs, es, tps, patss))
+      val (ids, vs, es, tps, pats, builder) = deconstructor.deconstruct(pat)
+      Some(pats, patss => builder(ids, vs, es, tps, patss))
     }
   }
 

@@ -33,11 +33,7 @@ trait TreeDeconstructor extends imperative.TreeDeconstructor {
   protected val s: Trees
   protected val t: Trees
 
-  override def deconstruct(e: s.Expr): 
-                          (
-                            Seq[Identifier], Seq[s.Variable], Seq[s.Expr], Seq[s.Type], 
-                            (Seq[Identifier], Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Expr
-                          ) = e match {
+  override def deconstruct(e: s.Expr): DeconstructedExpr = e match {
     case s.Hole(tp) =>
       (Seq(), Seq(), Seq(), Seq(tp), (_, _, _, tps) => t.Hole(tps.head))
     case other =>

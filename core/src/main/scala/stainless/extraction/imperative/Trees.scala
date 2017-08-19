@@ -202,11 +202,7 @@ trait TreeDeconstructor extends innerfuns.TreeDeconstructor {
   protected val s: Trees
   protected val t: Trees
 
-  override def deconstruct(e: s.Expr): 
-                          (
-                            Seq[Identifier], Seq[s.Variable], Seq[s.Expr], Seq[s.Type], 
-                            (Seq[Identifier], Seq[t.Variable], Seq[t.Expr], Seq[t.Type]) => t.Expr
-                          ) = e match {
+  override def deconstruct(e: s.Expr): DeconstructedExpr = e match {
     case s.BoolBitwiseAnd(lhs, rhs) =>
       (Seq(), Seq(), Seq(lhs, rhs), Seq(), (_, _, es, _) => t.BoolBitwiseAnd(es(0), es(1)))
 
@@ -228,7 +224,7 @@ trait TreeDeconstructor extends innerfuns.TreeDeconstructor {
       (Seq(), Seq(), Seq(v, value), Seq(), (_, _, es, _) => t.Assignment(es(0).asInstanceOf[t.Variable], es(1)))
 
     case s.FieldAssignment(obj, selector, value) =>
-      (Seq(), Seq(), Seq(obj, value), Seq(), (_, _, es, _) => t.FieldAssignment(es(0), selector, es(1)))
+      (Seq(selector), Seq(), Seq(obj, value), Seq(), (ids, _, es, _) => t.FieldAssignment(es(0), ids.head, es(1)))
 
     case s.While(cond, body, pred) =>
       (Seq(), Seq(), Seq(cond, body) ++ pred, Seq(), (_, _, es, _) => t.While(es(0), es(1), es.drop(2).headOption))
@@ -242,11 +238,7 @@ trait TreeDeconstructor extends innerfuns.TreeDeconstructor {
     case _ => super.deconstruct(e)
   }
 
-  override def deconstruct(f: s.Flag): 
-                          (
-                            Seq[Identifier], Seq[s.Expr], Seq[s.Type], 
-                            (Seq[Identifier], Seq[t.Expr], Seq[t.Type]) => t.Flag
-                          ) = f match {
+  override def deconstruct(f: s.Flag): DeconstructedFlag = f match {
     case s.IsVar => (Seq(), Seq(), Seq(), (_, _, _) => t.IsVar)
     case s.IsPure => (Seq(), Seq(), Seq(), (_, _, _) => t.IsPure)
     case s.IsMutable => (Seq(), Seq(), Seq(), (_, _, _) => t.IsMutable)

@@ -38,7 +38,7 @@ trait MainHelpers extends inox.MainHelpers {
 
   object optWatch extends inox.FlagOptionDef("watch", false)
 
-  override protected def getOptions = super.getOptions ++ Map(
+  override protected def getOptions = super.getOptions - inox.solvers.optAssumeChecked ++ Map(
     optFunctions -> Description(General, "Only consider functions s1,s2,..."),
     evaluators.optCodeGen -> Description(Evaluators, "Use code generating evaluator"),
     codegen.optInstrumentFields -> Description(Evaluators, "Instrument ADT field access during code generation"),
@@ -107,13 +107,13 @@ trait MainHelpers extends inox.MainHelpers {
       watcher.run()
     } else {
       // Process reports: print summary/export to JSON
-      val reports: Seq[AbstractReport] = inox.Bench.time("Getting reports", compiler.getReports)
-      reports foreach { p => inox.Bench.time("Emitting report", p.emit(ctx)) }
+      val reports: Seq[AbstractReport] = compiler.getReports
+      reports foreach { _.emit(ctx) }
 
       ctx.options.findOption(optJson) foreach { file =>
         val output = if (file.isEmpty) optJson.default else file
         ctx.reporter.info(s"Printing JSON summary to $output")
-        inox.Bench.time("call to exportJson", exportJson(reports, output))
+        exportJson(reports, output)
       }
     }
 
@@ -122,12 +122,10 @@ trait MainHelpers extends inox.MainHelpers {
     }
 
     // Shutdown the pool for a clean exit.
-    val unexecuted = inox.Bench.time("Shutting down pool", MainHelpers.executor.shutdownNow())
+    val unexecuted = MainHelpers.executor.shutdownNow()
     if (!ctx.interruptManager.isInterrupted && unexecuted.size != 0) {
       ctx.reporter.error("Some tasks were not run (" + unexecuted.size + ")")
     }
-
-    inox.Bench.reportS(ctx)
   } catch {
     case _: inox.FatalError => System.exit(1)
   }

@@ -106,15 +106,15 @@ trait SimpleComponent extends Component { self =>
   }
 
   def apply(program: Program { val trees: xt.type }): Report = {
-    val extracted = inox.Bench.time("call to extract", extract(program))
+    val extracted = extract(program)
     import extracted._
 
     val filter = new utils.CheckFilter { override val ctx = extracted.ctx }
-    val relevant = inox.Bench.time("gathering relevant functions", symbols.functions.values.toSeq filter { fd =>
+    val relevant = symbols.functions.values.toSeq filter { fd =>
       filter.shouldBeChecked(fd.id, fd.flags)
-    } map { _.id })
+    } map { _.id }
 
-    inox.Bench.time("call to apply2", apply(relevant, extracted))
+    apply(relevant, extracted)
   }
 
   def apply(functions: Seq[Identifier], program: Program { val trees: self.trees.type }): Report
