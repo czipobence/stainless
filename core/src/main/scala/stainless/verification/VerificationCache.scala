@@ -17,9 +17,6 @@ object DebugSectionCacheMiss extends inox.DebugSection("cachemiss")
 class AppendingObjectOutputStream(os: java.io.OutputStream) extends ObjectOutputStream(os) {
 
   override protected def writeStreamHeader() = {
-    // do not write a header, but reset:
-    // this line added after another question
-    // showed a problem with the original
     reset()
   }
 
@@ -53,7 +50,9 @@ trait VerificationCache extends VerificationChecker { self =>
           else if (program.symbols.adts.contains(id)) {
             val adtdef = program.symbols.adts(id)
             adts += adtdef
+            fundefs ++= adtdef.invariant
             traverse(adtdef)
+            adtdef.invariant foreach traverse
           }
         }
       }
@@ -72,12 +71,7 @@ trait VerificationCache extends VerificationChecker { self =>
     import VerificationCache._
 
     inox.Bench.time("checking VC with cache", {
-      ctx.reporter.debug("BUILDING DEPENDENCIES")(DebugSectionCache)
       val sp: SubProgram = inox.Bench.time("building dependencies", buildDependencies(vc))
-      ctx.reporter.synchronized {
-        ctx.reporter.debug(sp.symbols.asString(uniq))(DebugSectionCache)
-        ctx.reporter.debug(vc.condition.asString(uniq))(DebugSectionCache)
-      }
       val canonic = inox.Bench.time("canonizing", transformers.Canonization.canonize(sp.trees)(sp, vc))
       if (VerificationCache.contains(sp.trees)(canonic)) {
         ctx.reporter.synchronized {
@@ -104,9 +98,8 @@ trait VerificationCache extends VerificationChecker { self =>
 }
 
 object VerificationCache {
-  val cacheFile = "vccache.bin"
+  val cacheFile = ".vccache.bin"
   var vccache = scala.collection.concurrent.TrieMap[String,Unit]()
-  println("loading persistent cache")
   inox.Bench.time("loading persistent cache", VerificationCache.loadPersistentCache())
     
   def contains(tt: inox.ast.Trees)(p: (tt.Symbols, tt.Expr)) = {
@@ -159,22 +152,11 @@ object VerificationCache {
           try {
             while (true) {
               val s = ois.readObject.asInstanceOf[String]
-              // println("VERIFIED VC\n" + s + "\n---")
               vccache += ((s, ()))
             }
           } catch {
-            case e: java.net.SocketTimeoutException => 
-              // ctx.reporter.debug("Time out while reading cache")(DebugSectionCache)
             case e: java.io.EOFException =>
-              // println("FINISHED READING CACHE")
-              // ctx.reporter.debug("Reached end of cache file")(DebugSectionCache)
               ois.close()
-            case e: java.io.IOException =>
-              // ctx.reporter.debug("IO Error while reading cache")(DebugSectionCache)
-              e.printStackTrace()
-            case e: Throwable =>
-              // ctx.reporter.debug("Error while reading cache")(DebugSectionCache)
-              e.printStackTrace()
           }
         }
       })
