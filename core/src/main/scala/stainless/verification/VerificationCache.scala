@@ -15,11 +15,9 @@ object DebugSectionCache extends inox.DebugSection("vccache")
 object DebugSectionCacheMiss extends inox.DebugSection("cachemiss")
 
 class AppendingObjectOutputStream(os: java.io.OutputStream) extends ObjectOutputStream(os) {
-
   override protected def writeStreamHeader() = {
     reset()
   }
-
 }
 
 trait VerificationCache extends VerificationChecker { self =>
@@ -100,45 +98,44 @@ trait VerificationCache extends VerificationChecker { self =>
 object VerificationCache {
   val cacheFile = ".vccache.bin"
   var vccache = scala.collection.concurrent.TrieMap[String,Unit]()
-  inox.Bench.time("loading persistent cache", VerificationCache.loadPersistentCache())
+  VerificationCache.loadPersistentCache()
+  
+  // output stream used to save verified VCs 
+  val oos = if (new java.io.File(cacheFile).exists) {
+    new AppendingObjectOutputStream(new FileOutputStream(cacheFile, true))
+  } else {
+    new ObjectOutputStream(new FileOutputStream(cacheFile))
+  }
     
   def contains(tt: inox.ast.Trees)(p: (tt.Symbols, tt.Expr)) = {
-    inox.Bench.time("looking up VC in cache Map",
-      vccache.contains(serialize(tt)(p))
-    )
+    vccache.contains(serialize(tt)(p))
   }
     
   def add(tt: inox.ast.Trees)(p: (tt.Symbols, tt.Expr)) = {
-    inox.Bench.time("adding VC to cache Map",
-      vccache += ((serialize(tt)(p), ()))
-    )
+    vccache += ((serialize(tt)(p), ()))
   }
 
+  /**
+    * Transforms the dependencies of a VC and a VC to a String
+    * The functions and ADTs representations are sorted to avoid non-determinism
+    */
   def serialize(tt: inox.ast.Trees)(p: (tt. Symbols, tt. Expr)): String = {
     val uniq = new tt.PrinterOptions(printUniqueIds = true)
-    inox.Bench.time("transforming program to String", 
-      p._1.asString(uniq) + "\n#\n" + p._2.asString(uniq)
-    )
+    p._1.functions.values.map(fd => fd.asString(uniq)).toList.sorted.mkString("\n\n") + 
+    "\n#\n" + 
+    p._1.adts.values.map(adt => adt.asString(uniq)).toList.sorted.mkString("\n\n") + 
+    "\n#\n" + 
+    p._2.asString(uniq)
   }
 
   def addVCToPersistentCache(tt: inox.ast.Trees)(p: (tt. Symbols, tt. Expr), descr: String, ctx: inox.Context): Unit = {
 
     val task = new java.util.concurrent.Callable[String] {
       override def call(): String = {
-        inox.Bench.time("adding VC to persistent cache", 
-          MainHelpers.synchronized {
-            val oos = 
-              if (new java.io.File(cacheFile).exists) {
-                ctx.reporter.debug("Opening already existing cache file.")(DebugSectionCache)
-                new AppendingObjectOutputStream(new FileOutputStream(cacheFile, true))
-              } else {
-                ctx.reporter.debug("Creating new cache file")(DebugSectionCache)
-                new ObjectOutputStream(new FileOutputStream(cacheFile))
-              }
-            oos.writeObject(serialize(tt)(p))
-            descr
-          }
-        )
+        MainHelpers.synchronized {
+          oos.writeObject(serialize(tt)(p))
+          descr
+        }
       }
     }
     MainHelpers.executor.submit(task)
@@ -146,20 +143,17 @@ object VerificationCache {
   
   def loadPersistentCache(): Unit = {
     if (new java.io.File(cacheFile).exists) {
-      inox.Bench.time("loading persistent cache", {
-        MainHelpers.synchronized {
-          val ois = new ObjectInputStream(new FileInputStream(cacheFile))
-          try {
-            while (true) {
-              val s = ois.readObject.asInstanceOf[String]
-              vccache += ((s, ()))
-            }
-          } catch {
-            case e: java.io.EOFException =>
-              ois.close()
+      MainHelpers.synchronized {
+        val ois = new ObjectInputStream(new FileInputStream(cacheFile))
+        try {
+          while (true) {
+            val s = ois.readObject.asInstanceOf[String]
+            vccache += ((s, ()))
           }
+        } catch {
+          case e: java.io.EOFException => ois.close()
         }
-      })
+      }
     }
   }
 
