@@ -32,19 +32,10 @@ trait DefaultTactic extends Tactic {
 
   def generatePostconditions(id: Identifier): Seq[VC] = {
     val body = pushDownEnsuring(getFunction(id).fullBody)
-    // println("Pushed down ensuring")
-    // println(body.asString(PrinterOptions(printUniqueIds = true)))
     transformers.CollectorWithPC(program) {
       case (e @ Ensuring(body, lambda), path) =>
         val vc = path implies application(lambda, Seq(body))
-        // println("CREATING VC")
-        // println(vc)
-        // println(lambda.args.map(_.id).toSet)
         val res = VC(vc, id, VCKind.Postcondition, lambda.args.map(_.id.name).toSet)
-        // println(res)
-        // println("=========")
-        // println("=========")
-        // println("=========")
         res.setPos(e)
     }.collect(body)
   }
