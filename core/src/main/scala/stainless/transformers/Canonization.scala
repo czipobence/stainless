@@ -5,6 +5,8 @@ package transformers
 
 import stainless.extraction.inlining.Trees
 
+import scala.collection._
+
 trait Canonization { self =>
 
   val trees: stainless.ast.Trees
@@ -15,59 +17,40 @@ trait Canonization { self =>
 
   type VC = verification.VC[trees.type]
 
-  // Sequence of transformed function definitions
-  var functions = Seq[FunDef]()
-  // Sequence of transformed ADT definitions
-  var adts = Seq[ADTDefinition]()
+  def normalize(syms: s.Symbols, vc: VC): (t.Symbols, Expr) = {
 
-  def transform(syms: s.Symbols, vc: VC): (t.Symbols, Expr) = {
+    // Stores the transformed function and ADT definitions
+    var functions = Seq[FunDef]()
+    var adts = Seq[ADTDefinition]()
 
-    object idTransformer extends inox.ast.TreeTransformer {
+    object IdTransformer extends inox.ast.TreeTransformer {
       val s: self.trees.type = self.trees
       val t: self.trees.type = self.trees
 
       var localCounter = 0
       // Maps an original identifier to a normalized identifier
-      var renaming: Map[Identifier,Identifier] = Map()
+      val ids: mutable.Map[Identifier, Identifier] = mutable.Map.empty
 
-      def addRenaming(id: Identifier): Unit = {
-        if (!renaming.contains(id)) {
-          val newId = new Identifier("x",localCounter,localCounter)
-          localCounter = localCounter + 1
-          renaming += ((id, newId))
-        }
-      }
-
-      var traversed = Set[Identifier]()
-
-      def exploreFunDef(id: Identifier): Unit = {
-        if (syms.functions.contains(id) && !traversed(id)) {
-          traversed += id
-          val fd = syms.functions(id)
-          val newFD = transform(fd)
-          functions :+= newFD
-        }
-      }
-
-      def exploreADT(id: Identifier): Unit = {
-        if (syms.adts.contains(id) && !traversed(id)) {
-          traversed += id
-          val adt = syms.adts(id)
-          val newADT = transform(adt)
-          adts :+= newADT
-        }
+      def freshId(): Identifier = {
+        localCounter = localCounter + 1
+        new Identifier("x",localCounter,localCounter)
       }
 
       override def transform(id: Identifier): Identifier = {
-        addRenaming(id)
-        exploreFunDef(id)
-        exploreADT(id)
-        renaming(id)
+        val visited = ids contains id
+        val nid = ids.getOrElseUpdate(id, freshId())
+
+        if ((syms.functions contains id) && !visited) {
+          functions = transform(syms.functions(id)) +: functions
+        } else if ((syms.adts contains id) && !visited) {
+          adts = transform(syms.adts(id)) +: adts
+        }
+
+        nid
       }
     }
 
-    val newVCBody = idTransformer.transform(vc.condition)
-
+    val newVCBody = IdTransformer.transform(vc.condition)
     val newSyms = NoSymbols.withFunctions(functions).withADTs(adts)
 
     (newSyms, newVCBody)
@@ -76,14 +59,13 @@ trait Canonization { self =>
 
 
 object Canonization {
-  def canonize(trs: stainless.ast.Trees)
-              (p: inox.Program { val trees: trs.type }, vc: verification.VC[trs.type]): 
-                (p.trees.Symbols, trs.Expr)  = {
-    object canonizer extends Canonization {
+  def canonize(p: inox.Program { val trees: stainless.ast.Trees })(vc: verification.VC[p.trees.type]): 
+                (p.trees.Symbols, p.trees.Expr)  = {
+    object Canonizer extends Canonization {
       override val trees: p.trees.type = p.trees
     }
 
-    val (newSymbols, newVCBody) = canonizer.transform(p.symbols, vc)
+    val (newSymbols, newVCBody) = Canonizer.normalize(p.symbols, vc)
 
     (newSymbols, newVCBody)
   }

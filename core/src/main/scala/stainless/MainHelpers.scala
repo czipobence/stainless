@@ -124,10 +124,8 @@ trait MainHelpers extends inox.MainHelpers {
     inox.Bench.reportS(ctx)
 
     // Shutdown the pool for a clean exit.
-    val unexecuted = MainHelpers.executor.shutdownNow()
-    if (!ctx.interruptManager.isInterrupted && unexecuted.size != 0) {
-      ctx.reporter.error("Some tasks were not run (" + unexecuted.size + ")")
-    }
+    ctx.reporter.info("Shutting down executor service.")
+    MainHelpers.executor.shutdown()
   } catch {
     case _: inox.FatalError => System.exit(1)
   }
