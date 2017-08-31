@@ -43,9 +43,9 @@ trait DefaultTactic extends Tactic {
   def generatePreconditions(id: Identifier): Seq[VC] = {
     val fd = getFunction(id)
 
-    val calls = transformers.CollectorWithPC(program) {
+    val calls = collectForConditions {
       case (fi: FunctionInvocation, path) if fi.tfd.precondition.isDefined => (fi, path)
-    }.collect(fd.fullBody)
+    }(fd.fullBody)
 
     calls.map { case (fi @ FunctionInvocation(_, _, args), path) =>
       val pre = fi.tfd.withParamSubst(args, fi.tfd.precondition.get)
@@ -99,7 +99,7 @@ trait DefaultTactic extends Tactic {
     }
 
     // We don't collect preconditions here, because these are handled by generatePreconditions
-    val calls = transformers.CollectorWithPC(program) {
+    val calls = collectForConditions {
       case (m @ MatchExpr(scrut, cases), path) =>
         (m, path implies orJoin(cases map (matchCaseCondition[Path](scrut, _).toClause)))
 
@@ -117,7 +117,7 @@ trait DefaultTactic extends Tactic {
 
       case (a @ ADT(tpe, args), path) if tpe.getADT.hasInvariant =>
         (a, path implies FunctionInvocation(tpe.getADT.invariant.get.id, tpe.tps, Seq(a)))
-    }.collect(getFunction(id).fullBody)
+    }(getFunction(id).fullBody)
 
     calls.map { case (e, correctnessCond) =>
       VC(correctnessCond, id, eToVCKind(e)).setPos(e)

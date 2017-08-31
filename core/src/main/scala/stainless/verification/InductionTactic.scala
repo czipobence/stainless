@@ -55,9 +55,15 @@ trait InductionTactic extends DefaultTactic {
       case (Some(b), Some((tsort, arg))) =>
         val body = b
 
+<<<<<<< HEAD
         val calls = inox.Bench.time("collect calls", transformers.CollectorWithPC(program) {
           case (fi: FunctionInvocation, path) if fi.tfd.hasPrecondition => (fi, path)
         }.collect(body))
+=======
+        val calls = collectForConditions {
+          case (fi: FunctionInvocation, path) if fi.tfd.hasPrecondition => (fi, path)
+        }(body)
+>>>>>>> 703393b9ba32088ec2fa40754cd94a65f09e1d4a
 
         for {
           (fi @ FunctionInvocation(_, _, args), path) <- calls

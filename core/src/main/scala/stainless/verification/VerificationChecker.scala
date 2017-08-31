@@ -161,6 +161,7 @@ trait VerificationChecker { self =>
 }
 
 object VerificationChecker {
+<<<<<<< HEAD
 
   def verify(p: StainlessProgram, opts: inox.Options)
             (vcs: Seq[VC[p.trees.type]]): Map[VC[p.trees.type], VCResult[p.Model]] = {
@@ -171,13 +172,33 @@ object VerificationChecker {
       val program: p.type = p
       val options = opts
 
+=======
+  def apply(p: StainlessProgram, opts: inox.Options): VerificationChecker { val program: p.type } = {
+    class Checker extends VerificationChecker {
+      val program: p.type = p
+      val options = opts
+
+>>>>>>> 703393b9ba32088ec2fa40754cd94a65f09e1d4a
       protected def getFactory = solvers.SolverFactory.apply(p, opts)
     }
     object Checker extends CheckerInterface
     object CacheChecker extends CheckerInterface with VerificationCache
 
+<<<<<<< HEAD
     if (vccache) CacheChecker.verify(vcs)
     else Checker.verify(vcs)
+=======
+    if (opts.findOptionOrDefault(optVCCache)) {
+      new Checker with VerificationCache
+    } else {
+      new Checker
+    }
+  }
+
+  def verify(p: StainlessProgram, opts: inox.Options)
+            (vcs: Seq[VC[p.trees.type]]): Map[VC[p.trees.type], VCResult[p.Model]] = {
+    apply(p, opts).verify(vcs)
+>>>>>>> 703393b9ba32088ec2fa40754cd94a65f09e1d4a
   }
 
   def verify(p: StainlessProgram)(vcs: Seq[VC[p.trees.type]]): Map[VC[p.trees.type], VCResult[p.Model]] = {

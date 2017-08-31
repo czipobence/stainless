@@ -15,14 +15,21 @@ trait VerificationGenerator { self =>
 
   protected def getTactic(fd: FunDef): Tactic { val program: self.program.type }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 703393b9ba32088ec2fa40754cd94a65f09e1d4a
   def generateVCs(funs: Seq[Identifier]): Seq[VC] = {
     val vcs: Seq[VC] = (for (id <- funs) yield {
       val fd = getFunction(id)
       val tactic = getTactic(fd)
 
       if (fd.body.isDefined) {
+<<<<<<< HEAD
         inox.Bench.time("generating VCs", tactic.generateVCs(id))
+=======
+        tactic.generateVCs(id)
+>>>>>>> 703393b9ba32088ec2fa40754cd94a65f09e1d4a
       } else {
         Nil
       }
@@ -56,4 +63,8 @@ object VerificationGenerator {
     generator.generateVCs(funs)
   }
 
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 703393b9ba32088ec2fa40754cd94a65f09e1d4a
