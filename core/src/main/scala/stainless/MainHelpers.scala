@@ -17,7 +17,8 @@ object MainHelpers {
   /** See [[frontend.allComponents]]. */
   val components: Seq[Component] = frontend.allComponents
 
-  val useParallelism = !System.getProperty("os.name").toLowerCase().contains("mac")
+  // val useParallelism = !System.getProperty("os.name").toLowerCase().contains("mac")
+  val useParallelism = false
 
   /** Executor used to execute tasks concurrently. */
   // FIXME ideally, we should use the same underlying pool for the frontends' compiler...
