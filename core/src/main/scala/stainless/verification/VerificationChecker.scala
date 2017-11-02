@@ -160,6 +160,9 @@ object VerificationChecker {
       protected def getFactory = solvers.SolverFactory(p, ctx)
     }
 
+    println("Verifying program")
+    println(p.asString(ctx))
+
     val checker = if (ctx.options.findOptionOrDefault(optVCCache)) {
       new Checker with VerificationCache
     } else {
