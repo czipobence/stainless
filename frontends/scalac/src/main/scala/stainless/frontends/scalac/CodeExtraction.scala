@@ -763,9 +763,6 @@ trait CodeExtraction extends ASTExtractors {
       case _ => outOfSubsetError(tr, "Old is only defined on `this` and variables")
     }
 
-    case ExForceExpression(t) =>
-      xt.Force(extractTree(t))
-
     case ExErrorExpression(str, tpt) =>
       xt.Error(extractType(tpt), str)
 

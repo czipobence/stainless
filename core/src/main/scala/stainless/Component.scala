@@ -37,8 +37,7 @@ trait SimpleComponent extends Component { self =>
       (l, r) => l.lowering andThen r
     }
 
-    val extractedProgram = extraction.extract(program, ctx).transform(lowering)
-    forceEval.ForceEvaluation(extractedProgram, ctx).targetProgram
+    extraction.extract(program, ctx).transform(lowering)
   }
 
   private val marks = new utils.AtomicMarks[Identifier]

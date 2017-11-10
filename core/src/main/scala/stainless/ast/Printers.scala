@@ -14,9 +14,6 @@ trait Printer extends inox.ast.Printer {
     case Error(tpe, desc) =>
       p"""error[$tpe]("$desc")"""
 
-    case Force(expr) =>
-      p"""force($expr)"""
-
     case Require(pred, body) =>
       p"""|require($pred)
           |$body"""

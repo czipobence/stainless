@@ -753,8 +753,6 @@ class CodeExtraction(inoxCtx: inox.Context, cache: SymbolsContext)(implicit val 
     case ExPre(f) => xt.Pre(extractTree(f))
     case ExOld(e) => xt.Old(extractTree(e))
 
-    case ExForce(e) => xt.Force(extractTree(e))
-
     case t @ Select(
       str @ ExSymbol("stainless", "lang", "package$", "StringDecorations"),
       ExNamed("bigLength")

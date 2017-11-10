@@ -29,12 +29,6 @@ trait Expressions extends inox.ast.Expressions with inox.ast.Types { self: Trees
     def getType(implicit s: Symbols): Type = tpe
   }
 
-  // TODO
-  case class Force(expr: Expr) extends Expr with CachingTyped {
-    override def computeType(implicit s: Symbols): Type = expr.getType
-  }
-
-
   /** Precondition of an [[Expressions.Expr]]. Corresponds to the Stainless keyword *require*
     *
     * @param pred The precondition formula inside ``require(...)``
