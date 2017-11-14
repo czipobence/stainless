@@ -11,6 +11,7 @@ import scala.reflect.internal.util._
 import scala.collection.mutable.{Map => MutableMap, ListBuffer}
 
 import scala.language.implicitConversions
+import scala.reflect.runtime.{universe=>u}
 
 /**
  * Extract Scalac Trees into Stainless Trees.
@@ -248,7 +249,31 @@ trait CodeExtraction extends ASTExtractors {
     AnyRefClass.tpe
   )
 
+  // returns true if the cla
+  private def hasParameters(cd: ClassDef): Boolean = {
+    true
+  }
+
   private def extractClass(cd: ClassDef): (xt.ClassDef, Seq[xt.FunDef]) = {
+    if (cd.name.toString == "Wrapper") {
+      println(cd)
+      for (child <- cd.impl.children) {
+        child match {
+          case vd: ValDef =>
+            println("\n\nnew valdef")
+            println(vd.getClass)
+            println(vd)
+            // for (m <- vd.mods.children) {
+            //   println("modifier")
+            //   println(m)
+            // }
+          case vd =>
+            println("\n\nother stuff")
+            println(vd.getClass)
+            println(vd)
+        }
+      }
+    }
     val sym = cd.symbol
     val id = getIdentifier(sym)
 
