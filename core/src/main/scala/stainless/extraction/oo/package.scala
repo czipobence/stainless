@@ -27,11 +27,11 @@ package object oo {
     val t: trees.type = trees
   }
 
-  object encoding extends TypeEncoding {
-    val s: trees.type = trees
-    val t: holes.trees.type = holes.trees
-  }
+  // object encoding extends TypeEncoding {
+  //   val s: trees.type = trees
+  //   val t: holes.trees.type = holes.trees
+  // }
 
-  val extractor = methods andThen adts andThen encoding
+  val extractor = methods andThen adts
 
 }

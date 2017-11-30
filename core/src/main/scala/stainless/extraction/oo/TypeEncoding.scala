@@ -9,7 +9,7 @@ import scala.collection.mutable.{Map => MutableMap}
 
 trait TypeEncoding extends inox.ast.SymbolTransformer { self =>
   val s: Trees
-  val t: holes.Trees
+  val t: Trees
 
   def transform(symbols: s.Symbols): t.Symbols = {
     import t.{forall => _, _}
